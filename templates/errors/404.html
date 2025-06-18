@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Página Não Encontrada{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h1 class="display-4">404</h1>
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">Página não encontrada</h3>
+                    <p class="card-text">
+                        A página que você está procurando não existe ou foi movida.
+                    </p>
+                    <div class="mt-4">
+                        <a href="{{ url_for('menu') }}" class="btn btn-primary btn-lg">
+                            Voltar para o Menu Principal
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

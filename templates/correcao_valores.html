@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Correção Monetária{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">Voltar ao Menu</a>
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h2 class="mb-0">
+            Correção Monetária
+            <i class="bi bi-info-circle-fill text-info ms-2"
+               tabindex="0"
+               data-bs-toggle="tooltip"
+               data-bs-placement="right"
+               title="Agora você pode preencher datas completas (DD/MM/AAAA ou AAAA-MM-DD) OU apenas mês/ano (MM/AAAA). Para MM/AAAA, será considerado o mês todo."></i>
+        </h2>
+    </div>
+    <div class="card-body">
+        <form method="post" id="correcaoForm">
+            <div class="row mb-3">
+                <div class="col">
+                    <label>Índice:</label>
+                    <select name="indice" class="form-select">
+                        {% for i in indices %}
+                        <option value="{{ i }}">{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col">
+                    <label>Data Final <span class="text-muted">(DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA)</span>:</label>
+                    <input type="text" name="data_final" class="form-control" required value="{{ hoje }}" placeholder="Ex: 05/2023 ou 31/05/2023">
+                </div>
+            </div>
+            <div id="valores-dinamicos">
+                <div class="row mb-2">
+                    <div class="col">
+                        <label>Data Inicial <span class="text-muted">(DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA)</span>:</label>
+                        <input type="text" name="data_inicial[]" class="form-control" required placeholder="Ex: 05/2023 ou 01/05/2023">
+                        <small class="text-muted">Você pode digitar apenas o mês/ano se preferir (MM/AAAA)</small>
+                    </div>
+                    <div class="col">
+                        <label>Valor:</label>
+                        <input type="number" step="0.01" name="valor[]" class="form-control" placeholder="Valor" required>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addLinha()">Adicionar novo valor</button>
+            <button type="submit" class="btn btn-primary">Calcular</button>
+        </form>
+
+        {% if resultado %}
+        <hr>
+        <h5>Resultados:</h5>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Data Inicial</th>
+                    <th>Valor Original</th>
+                    <th>Valor Corrigido</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in resultado %}
+                <tr>
+                    <td>{{ r.data_inicial }}</td>
+                    <td>{{ r.valor_original|moeda_br }}</td>
+                    <td>{{ r.valor_corrigido|moeda_br }}</td>
+                    <td>
+                        <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#detalheModal{{ r.id }}">
+                            Ver detalhes
+                        </button>
+                        <!-- Modal Detalhes -->
+                        <div class="modal fade" id="detalheModal{{ r.id }}" tabindex="-1" aria-labelledby="detalheModalLabel{{ r.id }}" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content">
+                              <div class="modal-header">
+                                <h5 class="modal-title" id="detalheModalLabel{{ r.id }}">Detalhes da Correção</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                              </div>
+                              <div class="modal-body">
+                                <div class="alert alert-secondary mb-2" style="font-size: 0.98rem;">
+                                    <strong>Dados calculados</strong>
+                                    <hr class="my-2">
+                                    <div class="row mb-1">
+                                        <div class="col-7 text-end pe-2">
+                                            Índice de correção no período
+                                        </div>
+                                        <div class="col-5 fw-bold ps-1">
+                                            {{ r.fator_acumulado|br_decimal(8) if r.fator_acumulado is not none else "-" }}
+                                        </div>
+                                    </div>
+                                    <div class="row mb-1">
+                                        <div class="col-7 text-end pe-2">
+                                            Valor percentual correspondente
+                                        </div>
+                                        <div class="col-5 fw-bold ps-1">
+                                            {{ r.percentual_acumulado|br_decimal(6) if r.percentual_acumulado is not none else "-" }} %
+                                        </div>
+                                    </div>
+                                    <div class="row mb-1">
+                                        <div class="col-7 text-end pe-2">
+                                            Valor corrigido na data final
+                                        </div>
+                                        <div class="col-5 fw-bold ps-1">
+                                            {{ r.valor_corrigido|moeda_br }}
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12 text-end text-muted" style="font-size:0.93em;">
+                                            ({{ r.indice_utilizado }})
+                                        </div>
+                                    </div>
+                                </div>
+                              </div>
+                              <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</div>
+<script>
+function addLinha() {
+    let novo = document.createElement('div');
+    novo.className = "row mb-2";
+    novo.innerHTML = `
+        <div class="col">
+            <label>Data Inicial <span class="text-muted">(DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA)</span>:</label>
+            <input type="text" name="data_inicial[]" class="form-control" required placeholder="Ex: 05/2023 ou 01/05/2023">
+            <small class="text-muted">Você pode digitar apenas o mês/ano se preferir (MM/AAAA)</small>
+        </div>
+        <div class="col">
+            <label>Valor:</label>
+            <input type="number" step="0.01" name="valor[]" class="form-control" placeholder="Valor" required>
+        </div>
+    `;
+    document.getElementById('valores-dinamicos').appendChild(novo);
+}
+
+// Ativa tooltips do Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Menu Principal{% endblock %}
+
+{% block content %}
+<div class="menu-section-header">
+    <i class="bi bi-grid-1x2"></i> Menu de Funcionalidades
+</div>
+<div class="menu-cards-grid">
+    <a href="{{ url_for('principal') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-file-earmark-spreadsheet"></i></span>
+        <span class="menu-title">Análise de Pleitos</span>
+    </a>
+    <a href="{{ url_for('calcular_multa') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-calculator"></i></span>
+        <span class="menu-title">Cancelamentos - Calcular Multa</span>
+    </a>
+    <a href="{{ url_for('monitor_juridico') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-briefcase"></i></span>
+        <span class="menu-title">Monitor Jurídico</span>
+    </a>
+    <a href="{{ url_for('sla_dashboard') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-bar-chart"></i></span>
+        <span class="menu-title">Dashboard SLA Squad</span>
+    </a>
+    <a href="{{ url_for('correcao_valores') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-graph-up-arrow"></i></span>
+        <span class="menu-title">Correção Monetária</span>
+    </a>
+    <a href="{{ url_for('consulta_cnpj') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-search"></i></span>
+        <span class="menu-title">Consulta CNPJ/Cliente</span>
+    </a>
+    <a href="{{ url_for('show_logs') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-clock-history"></i></span>
+        <span class="menu-title">Visualizar Logs</span>
+    </a>
+    {% if session.can_manage_users %}
+    <a href="{{ url_for('manage_users') }}" class="menu-card">
+        <span class="menu-icon"><i class="bi bi-person-fill-gear"></i></span>
+        <span class="menu-title">Gerenciar Usuários</span>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+flask==2.3.2
+flask-sqlalchemy==3.0.3
+flask-wtf==1.2.2
+flask-migrate==4.1.0
+pandas==2.0.3
+numpy==1.24.3  # ← Versão compatível com pandas 2.0.3
+openpyxl==3.1.2
+python-dotenv==1.0.0
+werkzeug==2.3.6
+fpdf2==2.7.4
+gunicorn==20.1.0  # ← Versão mais estável
+requests==2.31.0

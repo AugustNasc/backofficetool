@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="login-bg" style="min-height: 85vh;">
+    <div class="login-card" style="max-width:380px;width:100%;margin:auto;">
+        <div class="text-center mb-4">
+            <img src="{{ url_for('static', filename='favicon.png') }}" alt="Logo" class="login-logo" style="width:54px;height:54px;border-radius:12px;">
+        </div>
+        <h2 class="login-title mb-1" style="font-size:1.6rem;font-weight:700;letter-spacing:1px;">Bem-vindo!</h2>
+        <p class="text-center mb-4" style="color:#6c7899;font-size:1.03rem;">Acesse o Backoffice Tools para gerenciar seus pleitos e atividades.</p>
+        <form method="POST" class="mt-3">
+            <div class="mb-3">
+                <label for="username" class="form-label">Usuário</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text" class="form-control" id="username" name="username" required autofocus maxlength="50" placeholder="Digite seu usuário">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Senha</label>
+                <div class="input-group" id="show_hide_password">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <input type="password" class="form-control" id="password" name="password" required maxlength="50" placeholder="Digite sua senha">
+                    <span class="input-group-text toggle-pwd" style="cursor:pointer;" onclick="togglePwd()">
+                        <i class="bi bi-eye-slash" id="togglePwdIcon"></i>
+                    </span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-login w-100 mt-3 mb-2" style="font-size:1.07rem;">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Entrar
+            </button>
+        </form>
+        <p class="text-center mt-3 mb-0" style="font-size:0.95rem;">Não tem uma conta? <a href="{{ url_for('register') }}">Registre-se aqui</a></p>
+        {% if erro %}
+            <div class="alert alert-danger mt-2 mb-0 p-2 text-center" style="font-size:0.97rem;">{{ erro }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function togglePwd() {
+    var pwd = document.getElementById("password");
+    var icon = document.getElementById("togglePwdIcon");
+    if (pwd.type === "password") {
+        pwd.type = "text";
+        icon.classList.remove("bi-eye-slash");
+        icon.classList.add("bi-eye");
+    } else {
+        pwd.type = "password";
+        icon.classList.remove("bi-eye");
+        icon.classList.add("bi-eye-slash");
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}Gestão de Pleitos{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao Menu
+</a>
+
+<div class="mb-3">
+    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#contasTransicaoModal">
+        <i class="bi bi-arrow-left-right"></i> Contas em Transição Beta
+    </button>
+</div>
+
+<!-- MODAL CONTAS EM TRANSIÇÃO -->
+<div class="modal fade" id="contasTransicaoModal" tabindex="-1" aria-labelledby="contasTransicaoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form class="modal-content" method="POST" action="{{ url_for('contas_transicao') }}" enctype="multipart/form-data">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title" id="contasTransicaoLabel">
+          <i class="bi bi-arrow-left-right"></i> Contas em Transição
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="alert alert-info mb-3">
+          <b>O que é?</b> Informe quais clientes estão em transição de consultor.<br>
+          Você pode carregar uma planilha (colunas <b>Cliente, Venda Realizada por, Gestão Atual</b>) ou adicionar manualmente.
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Carregar Planilha (.xlsx ou .csv)</label>
+          <input type="file" class="form-control" name="arquivo_transicao" accept=".csv,.xlsx">
+        </div>
+
+        <div class="mb-2 text-center"><b>Ou adicione manualmente:</b></div>
+        <table class="table table-bordered" id="transicaoTable">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Venda Realizada por</th>
+              <th>Gestão Atual</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="transicaoTbody"></tbody>
+        </table>
+        <button type="button" class="btn btn-outline-primary btn-sm" onclick="addTransicaoRow()"><i class="bi bi-plus-circle"></i> Adicionar Linha</button>
+        <input type="hidden" name="linhas_manualmente" id="linhasManuaisInput">
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Aplicar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- RESUMO POR CONSULTOR (cards + modal) -->
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0">Resumo por Consultor</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for box in resumo %}
+            <div class="col-md-3 mb-3">
+                <div 
+                    class="card resumo-consultor-card {% if box.total == 0 %}sem-atrasos{% endif %}"
+                    tabindex="0"
+                    data-index="{{ loop.index0 }}"
+                    onclick="mostrarPleitos(this)"
+                    style="cursor: pointer;">
+                    <div class="card-body p-3">
+                        <strong>{{ box.consultor }}</strong><br>
+                        Total: {{ box.total }}<br>
+                        <span class="fw-bold {% if box.total == 0 %}text-success{% else %}atrasados{% endif %}">
+                            {% if box.total == 0 %}Sem pleitos{% else %}Atrasados: {{ box.atrasados }}{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Tabelas de pleitos por consultor (ocultas) -->
+{% for box in resumo %}
+<div class="pleitos-tabela" id="tabela-{{ loop.index0 }}" style="display: none;">
+    <table class="table table-sm table-bordered align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Serviço</th>
+                <th>Status</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pleito in box.pleitos %}
+            <tr>
+                <td>{{ pleito.cliente }}</td>
+                <td>{{ pleito.assunto }}</td>
+                <td>{{ pleito.status }}</td>
+                <td>{{ pleito.data_criacao }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+
+<!-- Modal Bootstrap para detalhar pleitos do consultor (apenas Cód. de Controle, Valor, Serviço, Data) -->
+<div class="modal fade" id="pleitosModal" tabindex="-1" aria-labelledby="pleitosModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pleitosModalLabel">Pleitos do Consultor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body" id="modalPleitosBody">
+        <!-- Conteúdo gerado via JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmação para Substituição de Planilha -->
+<div class="modal fade" id="modalConfirmarSubstituir" tabindex="-1" aria-labelledby="modalConfirmarSubstituirLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title" id="modalConfirmarSubstituirLabel">
+          <i class="bi bi-exclamation-triangle-fill text-dark"></i> Substituir Planilha?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        Já existe uma planilha carregada.<br>
+        Deseja substituir pela nova? Esta ação removerá os dados anteriores.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmarSubstituirBtn">Substituir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filtros de busca -->
+<form method="POST" action="{{ url_for('analisar') }}" class="mb-3" enctype="multipart/form-data">
+    <div class="row align-items-end">
+        <div class="col-md-3 mb-2">
+            <label class="form-label">Coluna para Filtrar</label>
+            <select class="form-select" name="filter_column">
+                <option value="Consultor" {% if filter_column == 'Consultor' %}selected{% endif %}>Consultor</option>
+                <option value="Cliente" {% if filter_column == 'Cliente' %}selected{% endif %}>Cliente</option>
+                <option value="Produto" {% if filter_column == 'Produto' %}selected{% endif %}>Produto</option>
+                <option value="Valor" {% if filter_column == 'Valor' %}selected{% endif %}>Valor</option>
+                <option value="Data Pendência" {% if filter_column == 'Data Pendência' %}selected{% endif %}>Data Pendência</option>
+            </select>
+        </div>
+        <div class="col-md-5 mb-2">
+            <label class="form-label">Valor para Filtrar</label>
+            <input type="text" class="form-control" name="filter_value" placeholder="Digite o valor" value="{{ filter_value }}">
+        </div>
+        <div class="col-md-2 mb-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+        </div>
+        <div class="col-md-2 mb-2">
+            <a href="{{ url_for('limpar_filtro') }}" class="btn btn-outline-secondary w-100"><i class="bi bi-x-lg"></i> Limpar Filtro</a>
+        </div>
+    </div>
+</form>
+
+<!-- Upload de planilha -->
+<form method="POST" action="{{ url_for('principal') }}" enctype="multipart/form-data" class="mb-3" id="formUploadPlanilha">
+    <div class="row align-items-end">
+        <div class="col-md-8 mb-2">
+            <input type="file" name="file" class="form-control" accept=".xls,.xlsx" id="fileInputPlanilha">
+        </div>
+        <div class="col-md-4 mb-2">
+            <button type="submit" class="btn btn-success w-100" id="btnCarregarPlanilha">
+                <i class="bi bi-upload"></i> Carregar Planilha
+            </button>
+        </div>
+    </div>
+</form>
+
+{% if data %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    Exibindo {{ data_length }} registro(s). Mostrando até 20 na tabela abaixo.
+</div>
+<table class="table table-hover table-bordered">
+    <thead class="table-secondary">
+        <tr>
+            <th>Consultor</th>
+            <th>Cliente</th>
+            <th>Produto</th>
+            <th>Data Pendência</th>
+            <th>Valor</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in data %}
+        <tr>
+            <td>{{ row.Consultor }}</td>
+            <td>{{ row.Cliente }}</td>
+            <td>{{ row.Produto }}</td>
+            <td>{{ row['Data Pendência'] }}</td>
+            <td>{{ row.Valor }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    {% if filter_value %}
+    <div class="alert alert-warning">
+        Nenhum resultado encontrado para o filtro aplicado.<br>
+        <a href="{{ url_for('limpar_filtro') }}" class="btn btn-outline-secondary mt-2">
+            <i class="bi bi-x-lg"></i> Limpar Filtro e Voltar
+        </a>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">Nenhum dado carregado ou encontrado. Carregue uma planilha para começar.</div>
+    {% endif %}
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function mostrarPleitos(card) {
+    var idx = card.getAttribute('data-index');
+    var boxs = {{ resumo|tojson }};
+    var box = boxs[idx];
+    var accordionHtml = `<div class="accordion" id="accordionClientesPleitos">`;
+    var clienteIndex = 0;
+    for (var cliente in box.pleitos_por_cliente) {
+        clienteIndex++;
+        accordionHtml += `
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="heading${clienteIndex}">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${clienteIndex}" aria-expanded="false" aria-controls="collapse${clienteIndex}">
+                ${cliente}
+              </button>
+            </h2>
+            <div id="collapse${clienteIndex}" class="accordion-collapse collapse" aria-labelledby="heading${clienteIndex}" data-bs-parent="#accordionClientesPleitos">
+              <div class="accordion-body">
+                <table class="table table-sm table-bordered align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Cod. de Controle</th>
+                      <th>Valor</th>
+                      <th>Serviço</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+        `;
+        box.pleitos_por_cliente[cliente].forEach(function(pleito) {
+            accordionHtml += `
+              <tr>
+                <td>${pleito.codigo_controle || ''}</td>
+                <td>${pleito.valor || ''}</td>
+                <td>${pleito.assunto || ''}</td>
+                <td>${pleito.data_criacao || ''}</td>
+              </tr>
+            `;
+        });
+        accordionHtml += `
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+    }
+    accordionHtml += '</div>';
+
+    document.getElementById("modalPleitosBody").innerHTML = accordionHtml;
+    var nome = card.querySelector("strong").innerText;
+    document.getElementById("pleitosModalLabel").innerText = "Pleitos de " + nome;
+    var modal = new bootstrap.Modal(document.getElementById('pleitosModal'));
+    modal.show();
+}
+
+// Script para adicionar/remover linhas de contas em transição
+function addTransicaoRow(cliente='', venda='', gestao='') {
+    var tbody = document.getElementById('transicaoTbody');
+    var tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="form-control" value="${cliente}" required></td>
+        <td><input type="text" class="form-control" value="${venda}" required></td>
+        <td><input type="text" class="form-control" value="${gestao}" required></td>
+        <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    var formUpload = document.getElementById('formUploadPlanilha');
+    var fileInput = document.getElementById('fileInputPlanilha');
+    var btnUpload = document.getElementById('btnCarregarPlanilha');
+    var modalConfirm = new bootstrap.Modal(document.getElementById('modalConfirmarSubstituir'));
+    var confirmarSubstituirBtn = document.getElementById('confirmarSubstituirBtn');
+    let aguardandoConfirmacao = false;
+
+    {% if session['current_file'] %}
+    fileInput.addEventListener('click', function(e) {
+        if (!aguardandoConfirmacao) {
+            e.preventDefault();
+            modalConfirm.show();
+        }
+    });
+    btnUpload.addEventListener('click', function(e) {
+        if (!fileInput.value && !aguardandoConfirmacao) {
+            e.preventDefault();
+            modalConfirm.show();
+        }
+    });
+    confirmarSubstituirBtn.addEventListener('click', function() {
+        aguardandoConfirmacao = true;
+        modalConfirm.hide();
+        setTimeout(function() {
+            fileInput.click();
+            aguardandoConfirmacao = false;
+        }, 300);
+    });
+    document.getElementById('modalConfirmarSubstituir').addEventListener('hidden.bs.modal', function () {
+        aguardandoConfirmacao = false;
+    });
+    {% endif %}
+
+    // Ao submeter contas em transição, junta linhas manuais para enviar ao back-end
+    var formTransicao = document.querySelector('#contasTransicaoModal form');
+    if (formTransicao) {
+        formTransicao.addEventListener('submit', function(e) {
+            var rows = [];
+            document.querySelectorAll('#transicaoTbody tr').forEach(function(tr) {
+                var cols = tr.querySelectorAll('input');
+                rows.push([cols[0].value, cols[1].value, cols[2].value]);
+            });
+            document.getElementById('linhasManuaisInput').value = JSON.stringify(rows);
+        });
+    }
+});
+</script>
+{% endblock %}

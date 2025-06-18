@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Calcular Multa{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao Menu
+</a>
+<div class="container d-flex justify-content-center">
+  <div class="calcular-multa-card w-100" style="max-width: 1050px;">
+    <h2 class="calcular-multa-title">Calcular Multa de Cancelamento</h2>
+    <form method="POST" action="{{ url_for('calcular_multa') }}" id="formMulta">
+        <div class="row g-3 mb-4">
+            <div class="col-md-12">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="servicoRSFN" name="servico" value="rsfn">
+                    <label class="form-check-label" for="servicoRSFN">
+                        <strong>Serviço RSFN</strong> (Multa fixa <b>50%</b> e cancelamento imediato)
+                    </label>
+                </div>
+                <div class="mb-3">
+                    <label for="nome_cliente" class="form-label">Nome do Cliente (opcional):</label>
+                    <input type="text" class="form-control" id="nome_cliente" name="nome_cliente" placeholder="Deixe em branco se não desejar informar">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Data Recebimento da Carta</label>
+                <input type="date" class="form-control" name="data_recebimento"
+                       value="{{ hoje }}" required min="2000-01-01" max="2099-12-31">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Data de Ativação dos Serviços</label>
+                <input type="date" class="form-control" name="data_ativacao"
+                       required min="2000-01-01" max="2099-12-31">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Aviso Prévio (dias)</label>
+                <select class="form-select" name="aviso_previo" id="avisoPrevio" required>
+                    <option value="">Selecione...</option>
+                    <option value="30">30 dias</option>
+                    <option value="60" selected>60 dias</option>
+                    <option value="custom">Personalizado</option>
+                </select>
+                <input type="number" class="form-control mt-2 d-none" id="avisoCustom"
+                       name="aviso_custom" min="1" placeholder="Digite os dias">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Valor Total dos Serviços (R$)</label>
+                <input type="number" class="form-control" name="valor_servicos"
+                       step="0.01" min="0.01" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Prazo (Vigência)</label>
+                <select class="form-select" name="prazo_contrato" id="prazoContrato" required>
+                    <option value="">Selecione...</option>
+                    <option value="1">1 ano</option>
+                    <option value="2">2 anos</option>
+                    <option value="3">3 anos</option>
+                </select>
+                <div class="mt-2">
+                    <span id="percentualMultaBadge" class="badge bg-info text-dark fs-6" style="display:none;">
+                        <!-- % aparece aqui -->
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <button type="submit" class="btn btn-calcular-multa">
+                <i class="bi bi-calculator"></i> Calcular Multa
+            </button>
+        </div>
+    </form>
+  </div>
+</div>
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dataRecebimento = document.querySelector('input[name="data_recebimento"]');
+    const dataAtivacao = document.querySelector('input[name="data_ativacao"]');
+    const avisoSelect = document.getElementById('avisoPrevio');
+    const avisoCustom = document.getElementById('avisoCustom');
+    const servicoRSFN = document.getElementById('servicoRSFN');
+    const prazoContrato = document.getElementById('prazoContrato');
+    const badgeMulta = document.getElementById('percentualMultaBadge');
+
+    function atualizarPercentualMulta() {
+        if (servicoRSFN.checked) {
+            badgeMulta.textContent = "Multa fixa: 50% (RSFN)";
+            badgeMulta.className = "badge bg-info text-dark fs-6";
+            badgeMulta.style.display = "inline-block";
+            return;
+        }
+        let ativStr = dataAtivacao.value;
+        let recStr = dataRecebimento.value;
+        let prazo = prazoContrato.value;
+        let aviso = avisoSelect.value === 'custom' ? avisoCustom.value : avisoSelect.value;
+
+        if (!ativStr || !recStr || !prazo || !aviso) {
+            badgeMulta.style.display = "none";
+            badgeMulta.textContent = "";
+            return;
+        }
+        aviso = parseInt(aviso) || 0;
+        prazo = parseInt(prazo);
+
+        // Datas
+        const ativDate = new Date(ativStr);
+        const recDate = new Date(recStr);
+        let cancelamentoDate = new Date(recDate);
+        cancelamentoDate.setDate(cancelamentoDate.getDate() + aviso);
+
+        // Fim do contrato
+        let fimContratoDate = new Date(ativDate);
+        fimContratoDate.setDate(fimContratoDate.getDate() + prazo * 365);
+
+        // Cálculo do percentual de multa de acordo com tempo cumprido
+        let anosCumpridos = (cancelamentoDate - ativDate) / (1000 * 60 * 60 * 24 * 365); // anos decimais
+        let percentual = 0;
+
+        if (cancelamentoDate >= fimContratoDate) {
+            badgeMulta.textContent = "Isento (0% de multa)";
+            badgeMulta.className = "badge bg-success text-white fs-6";
+            badgeMulta.style.display = "inline-block";
+            return;
+        }
+
+        if (anosCumpridos < 1) {
+            percentual = 50;
+        } else if (anosCumpridos < 2) {
+            percentual = 40;
+        } else {
+            percentual = 30;
+        }
+
+        badgeMulta.textContent = "Multa: " + percentual + "% (tempo cumprido)";
+        badgeMulta.className = "badge bg-info text-dark fs-6";
+        badgeMulta.style.display = "inline-block";
+    }
+
+    avisoSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            avisoCustom.classList.remove('d-none');
+            avisoCustom.required = true;
+        } else {
+            avisoCustom.classList.add('d-none');
+            avisoCustom.required = false;
+        }
+        atualizarPercentualMulta();
+    });
+
+    servicoRSFN.addEventListener('change', function() {
+        if (this.checked) {
+            prazoContrato.value = '1';
+            prazoContrato.disabled = true;
+            avisoSelect.value = '0';
+            avisoSelect.disabled = true;
+            avisoCustom.disabled = true;
+        } else {
+            prazoContrato.disabled = false;
+            avisoSelect.disabled = false;
+            avisoSelect.value = '60';
+            avisoCustom.disabled = false;
+        }
+        atualizarPercentualMulta();
+    });
+
+    prazoContrato.addEventListener('change', atualizarPercentualMulta);
+    dataRecebimento.addEventListener('change', atualizarPercentualMulta);
+    dataAtivacao.addEventListener('change', atualizarPercentualMulta);
+    avisoCustom.addEventListener('input', atualizarPercentualMulta);
+
+    // Validação dos campos de data: impede ano "inválido"
+    [dataRecebimento, dataAtivacao].forEach(function(input) {
+        input.addEventListener('input', function() {
+            if (this.value) {
+                // Regex para AAAA-MM-DD e limite de ano entre 2000 e 2099
+                const regex = /^(20[0-9]{2})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/;
+                if (!regex.test(this.value)) {
+                    this.setCustomValidity("Data inválida. Use o formato AAAA-MM-DD e ano entre 2000 e 2099.");
+                } else {
+                    this.setCustomValidity("");
+                }
+            } else {
+                this.setCustomValidity("");
+            }
+        });
+    });
+
+    atualizarPercentualMulta();
+});
+</script>
+{% endblock %}
+{% endblock %}

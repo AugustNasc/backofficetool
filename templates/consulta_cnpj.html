@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Consulta CNPJ/Cliente{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao Menu
+</a>
+<div class="card mt-4 mb-4" style="max-width:520px; margin:auto;">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0"><i class="bi bi-search"></i> Consulta CNPJ/Cliente</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" autocomplete="off">
+            <div class="mb-3">
+                <label for="cnpj" class="form-label">CNPJ (com ou sem pontuação):</label>
+                <input type="text" class="form-control" id="cnpj" name="cnpj"
+                       placeholder="Ex: 12.345.678/0001-99 ou 12345678000199"
+                       value="{{ cnpj_input or '' }}" maxlength="18" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-search"></i> Consultar
+            </button>
+        </form>
+        {% if erro %}
+            <div class="alert alert-danger mt-3">{{ erro }}</div>
+        {% endif %}
+        {% if resultado %}
+            <div class="alert alert-success mt-3">
+                <strong>Dados encontrados para CNPJ {{ resultado['CNPJ'] }}</strong>
+            </div>
+            <table class="table table-bordered mt-2">
+                <tr><th>Razão Social</th><td>{{ resultado['Nome'] }}</td></tr>
+                <tr><th>Fantasia</th><td>{{ resultado['Fantasia'] }}</td></tr>
+                <tr><th>Data de Abertura</th><td>{{ resultado['Abertura'] }}</td></tr>
+                <tr><th>Situação</th><td>{{ resultado['Situação'] }}</td></tr>
+                <tr><th>Natureza Jurídica</th><td>{{ resultado['Natureza Jurídica'] }}</td></tr>
+                <tr><th>Atividade Principal</th><td>{{ resultado['Atividade Principal'] }}</td></tr>
+                <tr><th>UF</th><td>{{ resultado['UF'] }}</td></tr>
+                <tr><th>Município</th><td>{{ resultado['Município'] }}</td></tr>
+                <tr><th>Telefone</th><td>{{ resultado['Telefone'] }}</td></tr>
+                <tr><th>Email</th><td>{{ resultado['Email'] }}</td></tr>
+                <tr><th>Endereço</th><td>
+                    {{ resultado['Logradouro'] }},
+                    {{ resultado['Número'] }}{{ ', ' + resultado['Complemento'] if resultado['Complemento'] else '' }},
+                    {{ resultado['Bairro'] }}, {{ resultado['CEP'] }}
+                </td></tr>
+            </table>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

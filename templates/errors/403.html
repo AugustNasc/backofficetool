@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Acesso Proibido{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h1 class="display-4">403</h1>
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">Acesso Proibido</h3>
+                    <p class="card-text">
+                        Você não tem permissão para acessar esta página.
+                    </p>
+                    <div class="mt-4">
+                        <a href="{{ url_for('menu') }}" class="btn btn-primary btn-lg">
+                            Voltar para o Menu Principal
+                        </a>
+                        <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-lg ms-2">
+                            Sair
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}Monitor Jurídico{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao Menu
+</a>
+<div class="card mt-3">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">Monitor Jurídico</h2>
+        <button type="button" class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#modalFeriados" style="min-width:140px;">
+            <i class="bi bi-calendar-event"></i> Ver/Editar Feriados
+        </button>
+    </div>
+    <div class="card-body">
+        {% if erro %}
+            <div class="alert alert-danger">{{ erro }}</div>
+        {% endif %}
+        <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+            <span class="badge bg-success"><i class="bi bi-check2-circle"></i> Concluída</span>
+            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Atrasada (5+ dias)</span>
+            <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Quase atrasando (4 dias)</span>
+            <span class="badge bg-primary"><i class="bi bi-hourglass-split"></i> Recém criada (0-1 dia)</span>
+            <span class="badge bg-info text-dark"><i class="bi bi-arrow-right"></i> Liberação de Fluxo</span>
+            <span class="badge bg-primary text-white"><i class="bi bi-person-badge"></i> Squad</span>
+            <span class="badge bg-dark text-white"><i class="bi bi-dot"></i> Outros</span>
+            <span class="badge bg-area"><i class="bi bi-share"></i> Pendente com outra área</span>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="d-flex align-items-center mb-4" style="gap:12px;">
+            <label for="file" class="form-label mb-0 me-2"><strong>Importar planilha:</strong></label>
+            <input class="form-control form-control-sm" style="width:250px;max-width:250px;display:inline-block;" type="file" id="file" name="file" accept=".xlsx,.xls">
+            <button class="btn btn-outline-primary btn-sm ms-2" type="submit">
+                <i class="bi bi-upload"></i> Importar
+            </button>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle" id="tabelaAtividades">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data de Criação</th>
+                        <th>Assunto</th>
+                        <th>Tipo</th>
+                        <th>Proprietário</th>
+                        <th>Criada por</th>
+                        <th>Prioridade</th>
+                        <th>Dias desde Criação</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyAtividades">
+                    {% for a in atividades %}
+                        <tr class="{{ a.cor }}" data-original-class="{{ a.cor }}">
+                            <td>{{ a.data_criacao }}</td>
+                            <td>{{ a.assunto }}</td>
+                            <td>
+                                {% if a.tipo and a.tipo.lower().startswith('squad') %}
+                                    <span class="badge bg-primary">Squad</span>
+                                {% elif a.tipo and a.tipo.lower() == 'outros' %}
+                                    <span class="badge bg-dark">Outros</span>
+                                {% elif a.tipo %}
+                                    <span class="badge bg-success">{{ a.tipo }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ a.proprietario }}</td>
+                            <td>{{ a.criador }}</td>
+                            <td>
+                                <span class="prioridade-label">{% if a.prioridade == 'Solicitada' %}<b class="text-danger">Solicitada</b>{% endif %}</span>
+                                <button type="button" class="btn btn-warning btn-sm btn-prioridade ms-2" title="Priorizar"
+                                        {% if a.prioridade == 'Solicitada' %}style="display:none;"{% endif %}>
+                                    <i class="bi bi-arrow-up"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm btn-desprioridade ms-2" title="Remover Prioridade"
+                                        {% if a.prioridade != 'Solicitada' %}style="display:none;"{% endif %}>
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </td>
+                            <td>{{ a.dias }}</td>
+                            <td>
+                                <span class="span-status">{% if a.status.lower() == 'concluída' %}Concluída{% else %}{{ a.status or '' }}{% endif %}</span>
+                                <button type="button" class="btn btn-success btn-sm btn-status ms-2" title="Marcar como concluída"
+                                    {% if a.status.lower() == 'concluída' %}style="display:none;"{% endif %}>
+                                    <i class="bi bi-check2"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm btn-desstatus ms-2" title="Desmarcar concluída"
+                                    {% if a.status.lower() != 'concluída' %}style="display:none;"{% endif %}>
+                                    <i class="bi bi-x"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-area btn-outraarea ms-2" title="Marcar como pendente com outra área"
+                                    {% if a.status.lower() == 'concluída' %}style="display:none;"{% endif %}>
+                                    <i class="bi bi-share"></i>
+                                </button>
+                                <span class="badges-area ms-1"></span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if liberacoes %}
+        <h4 class="mt-4 mb-2">Liberações de Fluxo</h4>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data de Criação</th>
+                        <th>Assunto</th>
+                        <th>Tipo</th>
+                        <th>Proprietário</th>
+                        <th>Criada por</th>
+                        <th>Prioridade</th>
+                        <th>Dias desde Criação</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for l in liberacoes %}
+                        <tr class="{{ l.cor }}">
+                            <td>{{ l.data_criacao }}</td>
+                            <td>{{ l.assunto }}</td>
+                            <td>
+                                {% if l.tipo and l.tipo.lower().startswith('squad') %}
+                                    <span class="badge bg-primary">Squad</span>
+                                {% elif l.tipo and l.tipo.lower() == 'outros' %}
+                                    <span class="badge bg-dark">Outros</span>
+                                {% elif l.tipo %}
+                                    <span class="badge bg-success">{{ l.tipo }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Não informado</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ l.proprietario }}</td>
+                            <td>{{ l.criador }}</td>
+                            <td>{{ l.prioridade }}</td>
+                            <td>{{ l.dias }}</td>
+                            <td>{{ l.status }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalSelecionarArea" tabindex="-1" aria-labelledby="modalSelecionarAreaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-purple text-white">
+        <h5 class="modal-title" id="modalSelecionarAreaLabel"><i class="bi bi-share"></i> Pendência em outra área</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 small text-muted">
+          Selecione uma ou mais áreas responsáveis (máximo 4) e clique em <b>Aplicar</b>.<br>
+          Dica: Para remover, clique no "x" ao lado do nome da área.<br>
+          Atividades concluídas não permitem pendências em áreas.
+        </div>
+        <div class="d-flex mb-2">
+            <select class="form-select me-2" id="selectArea">
+                <option>Produtos</option>
+                <option>Faturamento</option>
+                <option>Área técnica</option>
+                <option>DPO</option>
+                <option>Consultor</option>
+            </select>
+            <button type="button" class="btn btn-outline-primary" id="btnAddArea">
+                <i class="bi bi-plus"></i> Adicionar
+            </button>
+        </div>
+        <div id="areasSelecionadas" class="mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="btnAplicarArea">Aplicar</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalFeriados" tabindex="-1" aria-labelledby="modalFeriadosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form method="post">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalFeriadosLabel"><i class="bi bi-calendar-event"></i> Feriados considerados</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p>Edite/remova os feriados (formato: dd/mm/yyyy). Separe por vírgula se desejar incluir vários:</p>
+          <textarea class="form-control" name="feriados" rows="4">{{ feriados|join(', ') }}</textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Salvar</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".btn-status").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            tr.classList.remove("atrasada", "quase-atrasando", "recem-criada");
+            tr.classList.add("concluida", "table-success");
+            var spanStatus = tr.querySelector('.span-status');
+            if (spanStatus) spanStatus.textContent = "Concluída";
+            btn.style.display = "none";
+            tr.querySelector('.btn-desstatus').style.display = "";
+            tr.querySelector('.btn-outraarea').style.display = "none";
+            var badgesArea = tr.querySelector('.badges-area');
+            if (badgesArea) badgesArea.innerHTML = "";
+        });
+    });
+    document.querySelectorAll(".btn-desstatus").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            tr.classList.remove("concluida", "table-success");
+            tr.className = tr.getAttribute("data-original-class");
+            var spanStatus = tr.querySelector('.span-status');
+            if (spanStatus) spanStatus.textContent = "";
+            btn.style.display = "none";
+            tr.querySelector('.btn-status').style.display = "";
+            tr.querySelector('.btn-outraarea').style.display = "";
+        });
+    });
+    document.querySelectorAll(".btn-prioridade").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            tr.querySelector('.prioridade-label').innerHTML = "<b class='text-danger'>Solicitada</b>";
+            btn.style.display = "none";
+            tr.querySelector('.btn-desprioridade').style.display = "";
+            tr.parentNode.insertBefore(tr, tr.parentNode.firstChild);
+            tr.style.background = "#fffbe4";
+            setTimeout(function(){ tr.style.background = ""; }, 1200);
+        });
+    });
+    document.querySelectorAll(".btn-desprioridade").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            tr.querySelector('.prioridade-label').innerHTML = "";
+            btn.style.display = "none";
+            tr.querySelector('.btn-prioridade').style.display = "";
+        });
+    });
+
+    var trSelecionada = null;
+    var areasTemp = [];
+    document.querySelectorAll(".btn-outraarea").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            trSelecionada = btn.closest("tr");
+            areasTemp = [];
+            var badgesArea = trSelecionada.querySelector('.badges-area');
+            if (badgesArea && badgesArea.children.length > 0) {
+                for (let badge of badgesArea.querySelectorAll('.badge.bg-area')) {
+                    areasTemp.push(badge.getAttribute('data-area'));
+                }
+            }
+            atualizarAreasSelecionadas();
+            var modal = new bootstrap.Modal(document.getElementById('modalSelecionarArea'));
+            modal.show();
+        });
+    });
+
+    document.getElementById('btnAddArea').addEventListener("click", function(){
+        var area = document.getElementById('selectArea').value;
+        if (areasTemp.length < 4 && !areasTemp.includes(area)) {
+            areasTemp.push(area);
+            atualizarAreasSelecionadas();
+        }
+    });
+
+    function atualizarAreasSelecionadas() {
+        var div = document.getElementById('areasSelecionadas');
+        var select = document.getElementById('selectArea');
+        var btnAdd = document.getElementById('btnAddArea');
+        div.innerHTML = "";
+        if (areasTemp.length >= 4) {
+            select.disabled = true;
+            btnAdd.disabled = true;
+        } else {
+            select.disabled = false;
+            btnAdd.disabled = false;
+        }
+        areasTemp.forEach(function(area, idx){
+            var tag = document.createElement("span");
+            tag.className = "badge bg-area ms-1 mb-1";
+            tag.setAttribute('data-area', area);
+            tag.innerHTML = area + " <button type='button' class='btn btn-xs btn-link text-white ms-1 btn-remover-area' data-idx='"+idx+"' style='padding:0 3px;font-size:14px;line-height:1;'><i class='bi bi-x'></i></button>";
+            div.appendChild(tag);
+        });
+        div.querySelectorAll(".btn-remover-area").forEach(function(btn){
+            btn.onclick = function() {
+                var idx = parseInt(btn.getAttribute("data-idx"));
+                areasTemp.splice(idx, 1);
+                atualizarAreasSelecionadas();
+            };
+        });
+    }
+
+    document.getElementById('btnAplicarArea').addEventListener("click", function() {
+        if (!trSelecionada) return;
+        var badgesArea = trSelecionada.querySelector('.badges-area');
+        badgesArea.innerHTML = "";
+        if (areasTemp.length > 0) {
+            areasTemp.forEach(function(area, i){
+                var badge = document.createElement("span");
+                badge.className = "badge bg-area ms-1 mb-1";
+                badge.setAttribute('data-area', area);
+                badge.innerText = (i === 0 ? "Pendente: " : "") + area;
+                badgesArea.appendChild(badge);
+            });
+            trSelecionada.classList.remove("concluida", "table-success");
+            trSelecionada.classList.add("table-area-externa");
+        } else {
+            trSelecionada.className = trSelecionada.getAttribute("data-original-class");
+        }
+        bootstrap.Modal.getInstance(document.getElementById('modalSelecionarArea')).hide();
+    });
+});
+</script>
+{% endblock %}

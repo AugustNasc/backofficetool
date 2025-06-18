@@ -1,0 +1,722 @@
+/* Bootstrap e base */
+
+body {
+    background-color: #f6f8fa;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Estilo das cards, tabelas e botões */
+
+.card {
+    border-radius: 18px;
+    box-shadow: 0 2px 12px rgba(50, 60, 100, 0.07);
+}
+
+.card-header {
+    border-radius: 18px 18px 0 0;
+    font-size: 1.15rem;
+    font-weight: 500;
+}
+
+.table thead th {
+    background-color: #eaf2fb;
+    font-size: 1rem;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+.btn,
+.btn-primary,
+.btn-outline-primary,
+.btn-outline-info,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-secondary {
+    border-radius: 1.2rem !important;
+    font-weight: 500;
+    font-size: 0.97rem;
+    transition: background 0.18s;
+    box-shadow: none !important;
+}
+
+.btn-outline-info, .btn-outline-secondary {
+    color: #095381 !important;
+    border-color: #31d2f2 !important;
+    background-color: #eaf6fb !important;
+}
+
+.btn-outline-info:hover, .btn-outline-secondary:hover {
+    background-color: #b2eafd !important;
+    color: #055160 !important;
+    border-color: #1bc2e7 !important;
+}
+
+.btn-primary, .btn-outline-primary {
+    background-color: #246dec;
+    border-color: #246dec;
+    color: #fff !important;
+}
+
+.btn-primary:hover, .btn-outline-primary:hover {
+    background-color: #1451b8;
+    border-color: #1451b8;
+    color: #fff !important;
+}
+
+.btn-sm {
+    padding: 0.22rem 0.75rem;
+    font-size: 0.94rem;
+    border-radius: 1.2rem;
+}
+
+/* ========== FIX CALCULAR MULTA ========== */
+.calcular-multa-card {
+    max-width: 1100px;
+    margin: 36px auto 0 auto;
+    background: #fff;
+    border-radius: 1.6rem;
+    box-shadow: 0 3px 22px #c8e3ff25;
+    padding: 2.6rem 2.4rem 2rem 2.4rem;
+    border: none;
+}
+.calcular-multa-title {
+    font-size: 2.3rem;
+    font-weight: 700;
+    color: #246dec;
+    margin-bottom: 18px;
+    letter-spacing: 0.5px;
+}
+.btn-calcular-multa {
+    background: #246dec;
+    color: #fff !important;
+    border-radius: 2.5rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+    box-shadow: 0 2px 12px #0054aa33;
+    padding: 0.58rem 1.7rem;
+    border: none;
+    margin-top: 1.1rem;
+    transition: background 0.18s, color 0.18s;
+    display: inline-block;
+}
+.btn-calcular-multa:hover,
+.btn-calcular-multa:focus {
+    background: #1451b8;
+    color: #fff !important;
+}
+
+.calcular-multa-card .form-control,
+.calcular-multa-card .form-select {
+    font-size: 1.08rem;
+    padding: 0.54rem 0.9rem;
+    border-radius: 0.95rem;
+    background: #f5f8ff;
+    border: 1.5px solid #d2e1f6;
+    box-shadow: 0 1px 5px #e3f1ff19;
+    color: #222f3e;
+    margin-bottom: 0.6rem;
+    transition: border 0.18s, background 0.18s;
+}
+.calcular-multa-card .form-control:focus,
+.calcular-multa-card .form-select:focus {
+    border: 1.7px solid #246dec;
+    background: #eef6ff;
+    color: #1859a5;
+    box-shadow: 0 1px 7px #b0daff1b;
+}
+.calcular-multa-card label.form-label {
+    color: #222e47;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+#servicoRSFN[type="checkbox"] {
+    width: 1.11em; height: 1.11em; vertical-align: middle; margin-right: 6px;
+}
+#percentualMultaBadge {
+    background: #eaf2fb;
+    color: #246dec;
+    font-weight: 700;
+    font-size: 1.1em;
+    border-radius: 1.1rem;
+    padding: 0.42em 1.1em;
+    margin-top: 0.4em;
+    margin-left: 0.1em;
+    display: inline-block;
+    letter-spacing: 0.7px;
+}
+
+/* Responsivo para Calcular Multa */
+@media (max-width: 1100px) {
+    .calcular-multa-card { max-width: 98vw; padding: 2rem 1rem; }
+}
+@media (max-width: 600px) {
+    .calcular-multa-title { font-size: 1.45rem; }
+    .calcular-multa-card { padding: 1.2rem 0.4rem; }
+}
+
+/* Ajuste do botão Voltar */
+a.btn-outline-primary.mb-3 {
+    font-size: 1rem;
+    padding: 0.44rem 1.5rem 0.44rem 1.05rem;
+    border-radius: 1.7rem !important;
+    margin-bottom: 1.3rem;
+    margin-top: 1.1rem;
+    background: #fff;
+    font-weight: 500;
+    border: 2px solid #246dec;
+    color: #246dec !important;
+    transition: background 0.13s, color 0.13s;
+}
+a.btn-outline-primary.mb-3:hover,
+a.btn-outline-primary.mb-3:focus {
+    background: #246dec !important;
+    color: #fff !important;
+}
+
+/* ==========  ESTILOS PERSONALIZADOS (ANTIGOS) ========== */
+input[type="file"].form-control {
+    padding: 0.2rem 0.5rem;
+    height: 2.1rem;
+    font-size: 0.97rem;
+    max-width: 210px;
+    background: #f8f9fa;
+    border-radius: 0.8rem;
+    border: 1px solid #dee2e6;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+}
+
+.badge {
+    border-radius: 0.8rem;
+    font-size: 1em;
+    padding: 0.38em 0.86em;
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+
+.badge.bg-warning { color: #302e1e !important; background-color: #ffe082 !important; }
+.badge.bg-primary { background-color: #67a0f8 !important; color: #fff !important; }
+.badge.bg-success { background-color: #40c057 !important; color: #fff !important; }
+.badge.bg-danger { background-color: #f44747 !important; color: #fff !important; }
+.badge.bg-secondary { background-color: #bbbcc1 !important; color: #383838 !important; }
+
+.legend-card {
+    background: #f4f6fb;
+    border-radius: 1rem;
+    padding: 1.2em 1em;
+    margin-left: 2em;
+    margin-top: 0.5em;
+    box-shadow: 0 1px 6px #dae3f3;
+    min-width: 220px;
+    max-width: 270px;
+}
+
+.list-unstyled .badge {
+    margin-right: 0.5em;
+    min-width: 110px;
+    display: inline-block;
+    margin-bottom: 0.5em;
+}
+
+@media (max-width: 991px) {
+    .legend-card { margin: 1.5em auto 0 auto; max-width: 97%; }
+    .card .row { flex-direction: column; }
+    .col-lg-9, .col-lg-3 { max-width: 100%; flex: 100%; }
+    .card .row .col-lg-3 { margin-top: 1.8rem; }
+}
+
+@media (max-width: 700px) {
+    .table thead, .table tbody, .table tr, .table th, .table td { font-size: 0.93rem; }
+}
+
+/* Botão modal igual aos principais */
+.btn-edit-feriados,
+#btnFeriados, .btn-modal, .btn-outline-primary {
+    background: #fff;
+    color: #246dec !important;
+    border: 1.5px solid #246dec;
+    border-radius: 1.2rem !important;
+    font-weight: 500;
+    padding: 0.3rem 1.1rem;
+    font-size: 0.97rem;
+    margin-bottom: 0.3em;
+    transition: background .15s, color .15s;
+}
+.btn-edit-feriados:hover,
+#btnFeriados:hover, .btn-modal:hover, .btn-outline-primary:hover {
+    background: #246dec !important;
+    color: #fff !important;
+}
+.modal-content { border-radius: 1.5rem; }
+textarea.form-control { border-radius: 1.1rem; min-height: 90px; }
+.alert { border-radius: 1.2rem; }
+::-webkit-scrollbar-thumb { background: #eaf2fb; border-radius: 1.3rem; }
+::-webkit-scrollbar { width: 8px; background: #f6f8fa; }
+
+.custom-file-input ~ .custom-file-label::after {
+    content: "Procurar";
+    color: #246dec;
+    background: #eaf2fb;
+    border-left: 1px solid #246dec;
+    padding: 0.32em 1em;
+    border-radius: 0 0.8rem 0.8rem 0;
+}
+input[type="file"].form-control:focus { outline: 1.5px solid #246dec; }
+
+@media (max-width: 540px) {
+    .legend-card { margin-bottom: 1.7em; }
+}
+.badge.status-marcado { background-color: #15e249 !important; color: #fff !important; }
+.table-responsive { padding-bottom: 0.5em; }
+.btn-outline-primary, .btn-primary, .btn-warning, .btn-success, .btn-secondary { min-width: 120px; }
+.table .btn { min-width: 28px; padding: 0.2rem 0.4rem; }
+#modalFeriados .modal-dialog { max-width: 360px; }
+input[type="file"].form-control-sm {
+    height: calc(1.2em + .5rem + 2px);
+    padding: .25rem .5rem;
+    font-size: .85em;
+    width: 170px;
+}
+.modal-content { border-radius: 10px; }
+.modal-footer .btn { min-width: 90px; }
+.btn-outline-primary[data-bs-toggle="modal"] {
+    display: inline-block !important;
+    margin-bottom: 0 !important;
+}
+.resumo-consultor-card[data-index][style*='#198754'] { border-color: #198754 !important; }
+
+/* ================= MENU DE FUNCIONALIDADES =================== */
+.menu-section-header {
+    background: #246dec;
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 700;
+    padding: 0.7rem 1.4rem;
+    border-radius: 0.8rem 0.8rem 0 0;
+    margin-bottom: -0.5rem;
+    box-shadow: 0 2px 8px #1b326c17;
+}
+.menu-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1.7rem 1.4rem;
+    padding: 2rem 1.2rem 2.2rem 1.2rem;
+    background: #fff;
+    border-radius: 1.3rem;
+    box-shadow: 0 2px 16px #eaf2fb66;
+    margin-bottom: 0.8rem;
+}
+.menu-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(120deg, #f8faff 88%, #eaf2fb 100%);
+    border-radius: 1.1rem;
+    padding: 1.2rem 1rem 1.1rem 1rem;
+    box-shadow: 0 1px 8px #eaf2fb44;
+    border: 1.5px solid #eaf2fb;
+    text-decoration: none;
+    color: #1c2940;
+    font-weight: 500;
+    font-size: 1.05em;
+    transition: box-shadow .18s, border-color .18s, transform .16s, background .19s;
+    min-height: 120px;
+    cursor: pointer;
+    position: relative;
+}
+.menu-card:hover, .menu-card:focus {
+    box-shadow: 0 6px 28px #a4c6f333;
+    border-color: #246dec77;
+    transform: translateY(-4px) scale(1.022);
+    background: linear-gradient(120deg, #eaf2fb 75%, #d6e6fc 100%);
+    color: #246dec;
+    text-decoration: none;
+    z-index: 3;
+}
+.menu-card .menu-icon {
+    font-size: 2.6rem;
+    margin-bottom: 0.7rem;
+    color: #246dec;
+    transition: color .18s;
+}
+.menu-card:hover .menu-icon { color: #194eac; }
+.menu-title { font-size: 1.05em; font-weight: 600; text-align: center; }
+@media (max-width: 650px) {
+    .menu-cards-grid {
+        grid-template-columns: 1fr;
+        padding: 1.1rem 0.2rem 1.2rem 0.2rem;
+        gap: 1.1rem 0.8rem;
+    }
+    .menu-card { min-height: 100px; }
+}
+
+/* --------- Dark mode para Menu --------- */
+body.dark-mode .menu-section-header { background: #233154; color: #a2c2ff; }
+body.dark-mode .menu-cards-grid { background: #181d29; box-shadow: 0 2px 30px #090c1655; }
+body.dark-mode .menu-card {
+    background: linear-gradient(120deg, #212940 85%, #1b2032 100%);
+    border-color: #232d47;
+    color: #d6e7ff;
+    box-shadow: 0 1px 12px #161d2b99;
+}
+body.dark-mode .menu-card .menu-icon { color: #6ca9ff; }
+body.dark-mode .menu-card:hover, body.dark-mode .menu-card:focus {
+    background: linear-gradient(120deg, #223466 65%, #253361 100%);
+    border-color: #4593e677;
+    color: #7bb5ff;
+}
+body.dark-mode .menu-card:hover .menu-icon, body.dark-mode .menu-card:focus .menu-icon { color: #a2cfff; }
+
+/* ================= LOGIN =================== */
+.login-bg {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(120deg, #eaf2fb 0%, #f8f9fa 100%);
+    position: relative;
+}
+.login-bg::after {
+    content: "";
+    position: absolute;
+    top: 10%; left: 55%;
+    width: 350px; height: 350px;
+    background: radial-gradient(circle at 60% 50%, #246dec55 0%, transparent 75%);
+    z-index: 0;
+    pointer-events: none;
+    filter: blur(10px);
+}
+body.dark-mode .login-bg {
+    background: linear-gradient(120deg, #121821 0%, #29304b 100%);
+}
+body.dark-mode .login-bg::after {
+    background: radial-gradient(circle at 60% 50%, #2a64bc77 0%, transparent 80%);
+}
+.login-card {
+    position: relative;
+    border-radius: 2rem;
+    box-shadow: 0 4px 24px 2px #b5ccfa44;
+    max-width: 410px;
+    margin: 0 auto;
+    padding: 2.3rem 2rem 2.1rem 2rem;
+    background: #fff;
+    animation: fadein 0.6s cubic-bezier(.51,1.23,.46,1.01);
+    z-index: 2;
+    transition: background .3s;
+}
+body.dark-mode .login-card {
+    background: #181d29;
+    box-shadow: 0 4px 30px 1px #11203466;
+}
+@keyframes fadein {
+    from { opacity: 0; transform: translateY(35px);}
+    to   { opacity: 1; transform: translateY(0);}
+}
+.login-logo {
+    background: #fff;
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 2px 12px #d8e6fb44;
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 1.5rem auto;
+}
+.login-title {
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 1.2rem;
+    color: #246dec;
+    letter-spacing: 1.2px;
+    font-size: 1.23em;
+}
+body.dark-mode .login-title { color: #67a0f8; }
+.input-group-text {
+    background: #eaf2fb;
+    border: none;
+    color: #246dec;
+    transition: background .2s;
+}
+body.dark-mode .input-group-text { background: #283c54; color: #6ca9ff; }
+.form-control:focus {
+    border-color: #246dec;
+    box-shadow: 0 0 0 2px #c3e1ff33;
+    transition: box-shadow .16s;
+}
+body.dark-mode .form-control { background: #232f4b; color: #d8eafd; border-color: #304266; }
+body.dark-mode .form-control:focus { border-color: #4b89e8; background: #2e3c59; color: #c3dafc; }
+.btn-login {
+    font-size: 1.07rem;
+    padding: 0.62em 0;
+    border-radius: 1.3rem;
+    font-weight: 600;
+    margin-top: 0.92em;
+    box-shadow: 0 2px 10px #eaf2fb40;
+    transition: background .2s, box-shadow .17s;
+}
+.btn-login:active { background: #0d6efd !important; box-shadow: 0 0px 1px #eaf2fb99; }
+.toggle-pwd {
+    cursor: pointer;
+    user-select: none;
+    padding-left: 7px;
+    color: #a0adc6;
+    transition: color .22s;
+}
+.toggle-pwd:hover { color: #246dec; }
+body.dark-mode .toggle-pwd:hover { color: #67a0f8; }
+@media (max-width: 600px) {
+    .login-card { padding: 1.5rem 0.7rem 1.2rem 0.7rem; }
+}
+
+/* ========== TEST MODO ESCURO (DARK MODE) PARA TUDO  ========== */
+body.dark-mode {
+    background-color: #111215 !important;
+    color: #e6e6e6;
+}
+body.dark-mode .card,
+body.dark-mode .table,
+body.dark-mode .table-responsive,
+body.dark-mode .resumo-consultor-card {
+    background: #22232a !important;
+    color: #e6e6e6 !important;
+    border-color: #22232a !important;
+    box-shadow: 0 2px 18px #12151e88 !important;
+}
+body.dark-mode .card-header,
+body.dark-mode .header-resumo,
+body.dark-mode .card-header.bg-primary,
+body.dark-mode .table th,
+body.dark-mode .table thead th,
+body.dark-mode .meu-header-cinza {
+    background: #232b36 !important;
+    color: #a2c2ff !important;
+}
+body.dark-mode .form-control,
+body.dark-mode input[type="text"],
+body.dark-mode input[type="file"],
+body.dark-mode input[type="password"],
+body.dark-mode select,
+body.dark-mode textarea {
+    background: #181b22 !important;
+    color: #d0e1fd !important;
+    border-color: #304266 !important;
+}
+body.dark-mode .form-control:focus,
+body.dark-mode input[type="text"]:focus,
+body.dark-mode input[type="file"]:focus,
+body.dark-mode input[type="password"]:focus,
+body.dark-mode select:focus,
+body.dark-mode textarea:focus {
+    background: #222940 !important;
+    color: #c3dafc !important;
+    border-color: #4593e6 !important;
+    box-shadow: 0 0 0 2px #3b74c688 !important;
+}
+body.dark-mode .input-group-text { background: #232c3d !important; color: #7bb5ff !important; border-color: #304266 !important; }
+body.dark-mode .btn, body.dark-mode .btn-primary, body.dark-mode .btn-outline-primary { box-shadow: 0 2px 16px #202c3a55 !important; }
+body.dark-mode .btn-outline-primary {
+    background: #202c3a !important;
+    color: #8fc3ff !important;
+    border-color: #4b89e8 !important;
+}
+body.dark-mode .btn-outline-primary:hover, body.dark-mode .btn-outline-primary:focus {
+    background: #246dec !important;
+    color: #fff !important;
+    border-color: #246dec !important;
+}
+body.dark-mode .btn-primary { background: #246dec !important; border-color: #246dec !important; color: #fff !important; }
+body.dark-mode .btn-primary:hover, body.dark-mode .btn-primary:focus { background: #1451b8 !important; border-color: #1451b8 !important; }
+body.dark-mode .btn-success { background: #27895c !important; border-color: #24784f !important; color: #fff !important; }
+body.dark-mode .btn-success:hover { background: #21a06a !important; }
+body.dark-mode .btn-outline-info { background: #222940 !important; color: #62d6ff !important; border-color: #62d6ff !important; }
+body.dark-mode .btn-outline-info:hover, body.dark-mode .btn-outline-info:focus { background: #15394a !important; color: #fff !important; }
+body.dark-mode .btn-outline-secondary, body.dark-mode .btn-outline-warning { background: #191e27 !important; color: #fae182 !important; border-color: #fae182 !important; }
+body.dark-mode .alert { background: #292d39 !important; color: #ffe082 !important; border-color: #545a68 !important; }
+body.dark-mode .alert-warning { background: #4e4906 !important; color: #ffe082 !important; }
+body.dark-mode .alert-info { background: #1e293b !important; color: #67a0f8 !important; }
+body.dark-mode .alert-success { background: #173924 !important; color: #b0ffc5 !important; }
+body.dark-mode .alert-danger { background: #45151a !important; color: #ffbcbc !important; }
+body.dark-mode label, body.dark-mode .form-label { color: #b3cfff !important; }
+body.dark-mode .custom-file-label, body.dark-mode .input-group .custom-file-label {
+    background: #181b22 !important;
+    color: #b3cfff !important;
+    border-color: #304266 !important;
+}
+body.dark-mode .dropdown-menu { background: #232940 !important; color: #d6e7ff !important; }
+body.dark-mode .dropdown-item { color: #d6e7ff !important; }
+body.dark-mode .dropdown-item:hover, body.dark-mode .dropdown-item:focus { background: #293046 !important; color: #67a0f8 !important; }
+body.dark-mode .badge { background: #232940 !important; color: #9dc3ff !important; }
+body.dark-mode .table th, body.dark-mode .table td { border-color: #232940 !important; }
+body.dark-mode .table { color: #e6e6e6 !important; }
+body.dark-mode .table thead th { color: #a2c2ff !important; background: #1a2134 !important; }
+body.dark-mode .table-striped > tbody > tr:nth-of-type(odd) { background-color: #171c28 !important; }
+body.dark-mode .resumo-consultor-card { border-color: #304266 !important; }
+body.dark-mode ::placeholder { color: #a0adc6 !important; opacity: 1; }
+body.dark-mode input[type="file"].form-control { background: #1e2330 !important; color: #c3dafc !important; border-color: #304266 !important; }
+body.dark-mode .btn-warning, body.dark-mode .btn-outline-warning { background: #b59416 !important; color: #fff !important; border-color: #ffe082 !important; }
+body.dark-mode .btn-warning:hover { background: #ffe082 !important; color: #b59416 !important; }
+body.dark-mode ::-webkit-scrollbar { background: #181b22 !important; }
+body.dark-mode ::-webkit-scrollbar-thumb { background: #222940 !important; }
+body.dark-mode input[type="text"], body.dark-mode input[type="file"], body.dark-mode input[type="password"], body.dark-mode select, body.dark-mode textarea { background: #181b22 !important; color: #d0e1fd !important; border-color: #304266 !important; }
+
+/* Dark para Calcular Multa */
+body.dark-mode .calcular-multa-card { background: #161e2a; color: #d0e7ff; box-shadow: 0 3px 26px #13223b65; border: none; }
+body.dark-mode .calcular-multa-title { color: #8ebcff; }
+body.dark-mode .calcular-multa-card .form-control, body.dark-mode .calcular-multa-card .form-select {
+    background: #1d2537; color: #b2cfff; border: 1.5px solid #384b67;
+}
+body.dark-mode .calcular-multa-card .form-control:focus, body.dark-mode .calcular-multa-card .form-select:focus {
+    background: #232e48; color: #c4e1ff; border-color: #4e7de6;
+}
+body.dark-mode .btn-calcular-multa { background: #246dec; color: #fff !important; }
+body.dark-mode .btn-calcular-multa:hover, body.dark-mode .btn-calcular-multa:focus { background: #4f7fd3; color: #fff !important; }
+body.dark-mode #percentualMultaBadge { background: #203362; color: #9dc6ff; }
+body.dark-mode a.btn-outline-primary.mb-3 { background: #181b24; color: #b8d7ff !important; border-color: #3777c2; }
+body.dark-mode a.btn-outline-primary.mb-3:hover, body.dark-mode a.btn-outline-primary.mb-3:focus { background: #246dec !important; color: #fff !important; border-color: #246dec !important; }
+
+
+/* ===== Legend/Status Cores na Tabela - MODO DARK ===== */
+body.dark-mode .table tr.concluida,
+body.dark-mode .table tr.table-success,
+body.dark-mode .legend-concluida {
+    background-color: #203f24 !important;
+    color: #b8ffb5 !important;
+}
+
+body.dark-mode .table tr.atrasada,
+body.dark-mode .table tr.table-danger,
+body.dark-mode .legend-atrasada {
+    background-color: #402024 !important;
+    color: #ffbdbd !important;
+}
+
+body.dark-mode .table tr.quase-atrasando,
+body.dark-mode .table tr.table-warning,
+body.dark-mode .legend-quase-atrasando {
+    background-color: #45402a !important;
+    color: #fff6b3 !important;
+}
+
+body.dark-mode .table tr.recem-criada,
+body.dark-mode .table tr.table-primary,
+body.dark-mode .legend-recem-criada {
+    background-color: #1c3042 !important;
+    color: #b3d8ff !important;
+}
+
+body.dark-mode .table tr.liberacao-fluxo,
+body.dark-mode .legend-liberacao-fluxo {
+    background-color: #243940 !important;
+    color: #b2ffff !important;
+}
+
+/* LEGENDA DAS CORES DOS STATUS - LIGHT */
+.badge.status-concluida { background: #33b249; color: #fff; }
+.badge.status-atrasada { background: #b71c1c; color: #fff; }
+.badge.status-quase { background: #d8b808; color: #fff; }
+.badge.status-recem { background: #1976d2; color: #fff; }
+.badge.status-liberacao { background: #00b8d4; color: #fff; }
+.badge.status-squad { background: #8c9eff; color: #fff; }
+.badge.status-outros { background: #263238; color: #fff; }
+.badge.status-prioridade { background: #ffd600; color: #7d6700; }
+
+/* DARK MODE - cores diferenciadas para cada status! */
+body.dark-mode .badge.status-concluida { background: #0b8235; color: #ccffd1; }
+body.dark-mode .badge.status-atrasada { background: #ff3366; color: #fff; }
+body.dark-mode .badge.status-quase { background: #ffe066; color: #232323; }
+body.dark-mode .badge.status-recem { background: #3898fc; color: #ffffff; }
+body.dark-mode .badge.status-liberacao { background: #3ffff3; color: #263238; }
+body.dark-mode .badge.status-squad { background: #4f6dff; color: #e3eaff; }
+body.dark-mode .badge.status-outros { background: #191f2b; color: #a7b8d9; }
+body.dark-mode .badge.status-prioridade { background: #d8bb00; color: #292408; }
+
+/* test Ajuste opcional para .table-quase, .table-atrasada, etc. */
+
+body.dark-mode .badge.bg-success,
+body.dark-mode .badge.status-concluida {
+    background: #203f24 !important;
+    color: #b8ffb5 !important;
+}
+body.dark-mode .badge.bg-danger,
+body.dark-mode .badge.status-atrasada {
+    background: #402024 !important;
+    color: #ffbdbd !important;
+}
+body.dark-mode .badge.bg-warning,
+body.dark-mode .badge.status-quase-atrasando {
+    background: #45402a !important;
+    color: #fff6b3 !important;
+}
+body.dark-mode .badge.bg-primary,
+body.dark-mode .badge.status-recem-criada {
+    background: #1c3042 !important;
+    color: #b3d8ff !important;
+}
+body.dark-mode .badge.bg-info,
+body.dark-mode .badge.status-liberacao-fluxo {
+    background: #243940 !important;
+    color: #b2ffff !important;
+}
+
+/* Força o fundo e texto da linha concluída (table-success) em ambos os temas */
+
+/* LIGHT MODE */
+tr.table-success,
+.table > tbody > tr.table-success,
+.table-success > td,
+.table-success > th {
+    background-color: #d1f4d6 !important; /* Verde Bootstrap light, ou escolha seu tom */
+    color: #1a3a20 !important;
+}
+
+/* DARK MODE */
+body.dark-mode tr.table-success,
+body.dark-mode .table > tbody > tr.table-success,
+body.dark-mode .table-success > td,
+body.dark-mode .table-success > th {
+    background-color: #257a3e !important; /* Verde escuro para dark */
+    color: #e5ffe7 !important;
+}
+
+/* Caso houver badges ou textos filhos, servirá para garantir contraste */
+tr.table-success .badge,
+body.dark-mode tr.table-success .badge {
+    color: #fff !important;
+    background: #37c85b !important;
+}
+
+/* Novo botão no monitor juridico */
+
+.badge.bg-area {
+    background: #c685d1;
+    color: #fff;
+    font-weight: 500;
+    font-size: 1em;
+}
+.table-area-externa {
+    background-color: #f5e7fc !important;
+}
+.btn-xs {
+    padding: 0 5px;
+    font-size: 14px;
+    line-height: 1;
+    border: none;
+    background: none;
+}
+
+.bg-area {
+    background: #c37ee6 !important;
+    color: #fff !important;
+    font-weight: 500;
+}
+
+/* ...fim :) */
