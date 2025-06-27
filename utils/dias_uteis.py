@@ -9,7 +9,6 @@ FERIADOS_2025 = [
     "07/04/2025",  # Paixão de Cristo
     "21/04/2025",  # Tiradentes
     "01/05/2025",  # Dia do Trabalho
-    "29/05/2025",  # Corpus Christi
     "09/07/2025",  # Revolução Constitucionalista SP
     "07/09/2025",  # Independência
     "12/10/2025",  # N. Sra Aparecida
@@ -17,6 +16,7 @@ FERIADOS_2025 = [
     "15/11/2025",  # Proclamação da República
     "20/11/2025",  # Consciência Negra (SP e RJ)
     "25/12/2025",  # Natal
+    "19/06/2025",  # Corpus Christi (SP)
 ]
 
 def dias_uteis_entre_datas(data_ini, data_fim, feriados):

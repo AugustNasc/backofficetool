@@ -101,13 +101,13 @@ source venv/bin/activate  # No Linux/macOS
 pip install -r requirements.txt
 
 # Configure variáveis de ambiente
-# Crie um arquivo '.env' na raiz do projeto, baseado no '.env.example'.
-# Exemplo de .env:
+# Edite o arquivo config.py para atualizar a SECRET_KEY e DATABASE_URL.
 # SECRET_KEY='sua_chave_secreta_super_segura_aqui'
 # DATABASE_URL='sqlite:///./instance/backoffice.db' # Ou outra URL de banco de dados
 
 # Inicialize o banco de dados e crie o usuário 'admin' padrão
-python init_db.py
+python init_db.py #Para criação do BD e usuário admin. 
+python app.py  #Para start da aplicação.
 
 # Rode a aplicação localmente
 flask run --host=0.0.0.0 --port=10000
