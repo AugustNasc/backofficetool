@@ -1,4 +1,4 @@
-setuptools>=42
+setuptools>=61
 wheel
 flask==2.3.2
 flask-sqlalchemy==3.0.3
