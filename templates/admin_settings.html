@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Configurações do Administrador{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao Menu
+</a>
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h2 class="mb-0">
+            <i class="bi bi-gear-fill"></i> Configurações do Administrador
+        </h2>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_settings') }}">
+            <h4 class="mb-3">Configuração de Pleitos Atrasados</h4>
+            <div class="mb-3">
+                <label for="data_limite_pleitos_atrasados" class="form-label">
+                    Data Limite para Considerar Pleitos Atrasados:
+                </label>
+                <input type="date" class="form-control" id="data_limite_pleitos_atrasados"
+                       name="data_limite_pleitos_atrasados"
+                       value="{{ data_limite_atraso }}" required>
+                <div class="form-text">
+                    Pleitos com Data de Pendência **anterior ou igual** a esta data serão contados como atrasados.
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Salvar Configurações
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

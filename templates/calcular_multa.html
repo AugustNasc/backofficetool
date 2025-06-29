@@ -58,8 +58,19 @@
                 </select>
                 <div class="mt-2">
                     <span id="percentualMultaBadge" class="badge bg-info text-dark fs-6" style="display:none;">
-                        <!-- % aparece aqui -->
-                    </span>
+                        </span>
+                    <button type="button" class="btn btn-outline-info btn-sm ms-2" id="btnPersonalizarMulta">
+                        <i class="bi bi-pencil-square me-1"></i> Personalizar % Multa
+                    </button>
+                </div>
+            </div>
+            {# NOVO CAMPO: PERCENTUAL DE MULTA PERSONALIZADO #}
+            <div class="col-md-6" id="divMultaPersonalizada" style="display:none;">
+                <label class="form-label">Percentual de Multa Personalizado (%)</label>
+                <input type="number" class="form-control" id="multaPersonalizada" name="multa_personalizada"
+                       step="0.01" min="0" max="100" placeholder="Ex: 30, 45.5">
+                <div class="form-text">
+                    Será usado em vez do cálculo automático. Deixe em branco para usar o cálculo padrão.
                 </div>
             </div>
         </div>
@@ -83,13 +94,34 @@ document.addEventListener('DOMContentLoaded', function() {
     const prazoContrato = document.getElementById('prazoContrato');
     const badgeMulta = document.getElementById('percentualMultaBadge');
 
+    const btnPersonalizarMulta = document.getElementById('btnPersonalizarMulta');
+    const divMultaPersonalizada = document.getElementById('divMultaPersonalizada');
+    const multaPersonalizadaInput = document.getElementById('multaPersonalizada');
+
+    let isMultaPersonalizadaAtiva = false; // Estado para controlar a visibilidade do campo
+
     function atualizarPercentualMulta() {
         if (servicoRSFN.checked) {
             badgeMulta.textContent = "Multa fixa: 50% (RSFN)";
             badgeMulta.className = "badge bg-info text-dark fs-6";
             badgeMulta.style.display = "inline-block";
+            // Desativa a personalização para RSFN
+            btnPersonalizarMulta.style.display = "none";
+            divMultaPersonalizada.style.display = "none";
+            multaPersonalizadaInput.value = ""; // Limpa o valor
+            multaPersonalizadaInput.required = false;
+            isMultaPersonalizadaAtiva = false;
+            return;
+        } else {
+            btnPersonalizarMulta.style.display = "inline-block"; // Mostra o botão novamente
+        }
+
+        if (isMultaPersonalizadaAtiva) {
+            badgeMulta.style.display = "none"; // Esconde o badge se a personalização estiver ativa
             return;
         }
+
+
         let ativStr = dataAtivacao.value;
         let recStr = dataRecebimento.value;
         let prazo = prazoContrato.value;
@@ -104,17 +136,20 @@ document.addEventListener('DOMContentLoaded', function() {
         prazo = parseInt(prazo);
 
         // Datas
-        const ativDate = new Date(ativStr);
-        const recDate = new Date(recStr);
+        const ativDate = new Date(ativStr + 'T00:00:00'); // Adiciona T00:00:00 para evitar problemas de fuso horário
+        const recDate = new Date(recStr + 'T00:00:00');
         let cancelamentoDate = new Date(recDate);
         cancelamentoDate.setDate(cancelamentoDate.getDate() + aviso);
 
         // Fim do contrato
         let fimContratoDate = new Date(ativDate);
-        fimContratoDate.setDate(fimContratoDate.getDate() + prazo * 365);
+        fimContratoDate.setFullYear(fimContratoDate.getFullYear() + prazo);
+        fimContratoDate.setDate(fimContratoDate.getDate() - 1); // Subtrai 1 dia para pegar o dia anterior ao aniversário
 
         // Cálculo do percentual de multa de acordo com tempo cumprido
-        let anosCumpridos = (cancelamentoDate - ativDate) / (1000 * 60 * 60 * 24 * 365); // anos decimais
+        let diffTime = cancelamentoDate.getTime() - ativDate.getTime();
+        let anosCumpridos = diffTime / (1000 * 60 * 60 * 24 * 365.25); // Considera anos bissextos
+
         let percentual = 0;
 
         if (cancelamentoDate >= fimContratoDate) {
@@ -132,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
             percentual = 30;
         }
 
-        badgeMulta.textContent = "Multa: " + percentual + "% (tempo cumprido)";
+        badgeMulta.textContent = "Multa: " + percentual + "% (cálculo automático)";
         badgeMulta.className = "badge bg-info text-dark fs-6";
         badgeMulta.style.display = "inline-block";
     }
@@ -158,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             prazoContrato.disabled = false;
             avisoSelect.disabled = false;
-            avisoSelect.value = '60';
+            avisoSelect.value = '60'; // Volta para o padrão de 60 dias
             avisoCustom.disabled = false;
         }
         atualizarPercentualMulta();
@@ -168,6 +203,34 @@ document.addEventListener('DOMContentLoaded', function() {
     dataRecebimento.addEventListener('change', atualizarPercentualMulta);
     dataAtivacao.addEventListener('change', atualizarPercentualMulta);
     avisoCustom.addEventListener('input', atualizarPercentualMulta);
+    multaPersonalizadaInput.addEventListener('input', function() {
+        // Se o usuário digitar algo na multa personalizada, desativa o cálculo automático
+        if (this.value !== "") {
+            badgeMulta.style.display = "none";
+        } else {
+            // Se apagar, volta a mostrar o cálculo automático
+            atualizarPercentualMulta();
+        }
+    });
+
+    btnPersonalizarMulta.addEventListener('click', function() {
+        isMultaPersonalizadaAtiva = !isMultaPersonalizadaAtiva; // Inverte o estado
+        if (isMultaPersonalizadaAtiva) {
+            divMultaPersonalizada.style.display = "block"; // Mostra o campo
+            multaPersonalizadaInput.required = true; // Torna obrigatório
+            badgeMulta.style.display = "none"; // Esconde o badge
+            btnPersonalizarMulta.textContent = "Usar Cálculo Automático";
+            btnPersonalizarMulta.classList.replace('btn-outline-info', 'btn-outline-secondary');
+        } else {
+            divMultaPersonalizada.style.display = "none"; // Oculta o campo
+            multaPersonalizadaInput.value = ""; // Limpa o valor
+            multaPersonalizadaInput.required = false;
+            atualizarPercentualMulta(); // Volta a mostrar o badge e recalcula
+            btnPersonalizarMulta.textContent = "Personalizar % Multa";
+            btnPersonalizarMulta.classList.replace('btn-outline-secondary', 'btn-outline-info');
+        }
+    });
+
 
     // Validação dos campos de data: impede ano "inválido"
     [dataRecebimento, dataAtivacao].forEach(function(input) {
@@ -186,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Inicia com o percentual de multa atualizado
     atualizarPercentualMulta();
 });
 </script>

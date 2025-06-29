@@ -8,10 +8,10 @@ import pandas as pd
 import requests
 import statistics
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from uuid import uuid4
 from io import BytesIO
-from functools import wraps # Importado para os decoradores
+from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session, flash,
@@ -23,7 +23,7 @@ from wtforms import StringField, validators
 from werkzeug.utils import secure_filename
 
 # modelos e config
-from models import db, User, Log, Pleito, Role # Importado Role
+from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica
 from config import Config
 
 # Bibliotecas de terceiros
@@ -35,10 +35,10 @@ import xlsxwriter
 from utils.pdf_generator import preparar_base_pdf, exportar_sla_pdf
 from utils.excel_export import preparar_base_excel, exportar_sla_excel, exportar_logs_excel
 from utils.file_processing import (
-    analisar_atividades_juridico, process_hotlines,
+    process_hotlines,
     analyze_pleitos, filtrar_clientes_excluidos, safe_float
 )
-from utils.dias_uteis import dias_uteis_entre_datas, FERIADOS_2025
+from utils.dias_uteis import dias_uteis_entre_datas
 from utils.value_correction import corrigir_valor
 from utils.auth import authenticate_user
 
@@ -107,8 +107,6 @@ def permission_required(permission_name):
     return decorator
 
 # Função para passar as permissões do usuário para os templates
-# Função para passar as permissões do usuário para os templates
-# Função para passar as permissões do usuário para os templates
 @app.before_request
 def load_user_permissions():
     if 'username' in session:
@@ -141,12 +139,12 @@ def load_user_permissions():
                 if col.name.startswith('can_') or col.name.startswith('is_'):
                     setattr(guest_role, col.name, False)
             logger.warning("Role 'Guest' não encontrada no DB. Usando objeto temporário.")
-            
+
         session['user_role'] = guest_role.name
         for col in guest_role.__table__.columns:
             if col.name.startswith('can_') or col.name.startswith('is_'):
                 session[col.name] = getattr(guest_role, col.name)
-        
+
     # Colocar isso após as verificações acima para evitar que erros interrompam o carregamento.
     # Exemplo: session.permanent = True # Se quiser sessões mais longas
     current_app.logger.debug(f"Permissões carregadas para {session.get('username', 'Guest')}: {session.get('user_role')}")
@@ -172,6 +170,8 @@ def format_date_filter(date_str):
             return datetime.strptime(date_str, '%d/%m/%Y').strftime('%d/%m/%Y')
         elif isinstance(date_str, datetime):
             return date_str.strftime('%d/%m/%Y')
+        elif isinstance(date_str, date): # Adicionado para objetos date puros
+            return date_str.strftime('%d/%m/%Y')
         return date_str
     except:
         return date_str
@@ -188,7 +188,7 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
+
         if authenticate_user(username, password):
             session['username'] = username
             user = User.query.filter_by(username=username).first()
@@ -219,12 +219,12 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
+
         # Validar dados de entrada
         if not username or not password:
             flash('Usuário e senha são obrigatórios.', 'danger')
             return render_template('register.html')
-        
+
         if len(username) < 3 or len(username) > 50:
             flash('O nome de usuário deve ter entre 3 e 50 caracteres.', 'danger')
             return render_template('register.html')
@@ -249,7 +249,7 @@ def register():
 
         new_user = User(username=username, role=consultor_role)
         new_user.set_password(password)
-        
+
         try:
             db.session.add(new_user)
             db.session.commit()
@@ -280,10 +280,10 @@ def logout():
         user = User.query.filter_by(username=username).first()
         if user:
             user_id = user.id
-    
+
     session.clear()
     flash('Você foi desconectado com sucesso.', 'info')
-    
+
     new_log = Log(
         action="LOGOUT",
         details=f"Usuário {username if username else 'desconhecido'} desconectado.",
@@ -292,7 +292,7 @@ def logout():
     )
     db.session.add(new_log)
     db.session.commit()
-    
+
     return redirect(url_for('login'))
 
 @app.route('/manage_users', methods=['GET', 'POST'])
@@ -300,11 +300,11 @@ def logout():
 def manage_users():
     users = User.query.options(db.joinedload(User.role)).all() # Carrega usuários com suas roles
     roles = Role.query.all() # Para o dropdown de roles
-    
+
     if request.method == 'POST':
         action = request.form.get('action')
         user_id = request.form.get('user_id')
-        
+
         user_to_act = User.query.get(user_id)
         if not user_to_act:
             flash('Usuário não encontrado.', 'danger')
@@ -318,7 +318,7 @@ def manage_users():
                 user_to_act.role = new_role
                 db.session.commit()
                 flash(f'Perfil do usuário {user_to_act.username} atualizado para {new_role.name}!', 'success')
-                
+
                 # Log da edição de perfil
                 editor_user = User.query.filter_by(username=session['username']).first()
                 log_details = f"Perfil de '{user_to_act.username}' (ID: {user_to_act.id}) alterado de '{old_role_name}' para '{new_role.name}'."
@@ -328,12 +328,12 @@ def manage_users():
 
             else:
                 flash('Perfil selecionado inválido.', 'danger')
-        
+
         elif action == 'delete_user':
             if user_to_act.username == session['username']:
                 flash('Você não pode excluir seu próprio usuário enquanto está logado.', 'danger')
                 return redirect(url_for('manage_users'))
-            
+
             # Não permitir exclusão do Admin principal se for o único Admin
             if user_to_act.role.name == 'Admin' and User.query.filter_by(role=Role.query.filter_by(name='Admin').first()).count() <= 1:
                  flash('Não é possível excluir o único usuário Admin.', 'danger')
@@ -349,7 +349,7 @@ def manage_users():
             db.session.delete(user_to_act)
             db.session.commit()
             flash(f'Usuário {user_to_act.username} excluído com sucesso.', 'success')
-            
+
         elif action == 'reset_password':
             # Implementar um formulário para redefinir a senha com uma nova (ou genérica)
             # Por simplicidade, vamos usar uma senha temporária 'mudar123'
@@ -366,8 +366,57 @@ def manage_users():
             db.session.commit()
 
         return redirect(url_for('manage_users'))
-        
+
     return render_template('manage_users.html', users=users, roles=roles)
+
+# Rota de Admin Settings
+@app.route('/admin_settings', methods=['GET', 'POST'])
+@permission_required('can_manage_users') # Apenas Admin pode acessar configurações gerais
+def admin_settings():
+    config_atraso = Configuracao.query.filter_by(chave='data_limite_pleitos_atrasados').first()
+    data_limite_atraso = config_atraso.valor if config_atraso else (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d') # Valor padrão se não existir
+
+    if request.method == 'POST':
+        nova_data_str = request.form.get('data_limite_pleitos_atrasados')
+
+        try:
+            # Tentar converter a data para garantir que é um formato válido antes de salvar
+            datetime.strptime(nova_data_str, '%Y-%m-%d')
+            if config_atraso:
+                config_atraso.valor = nova_data_str
+            else:
+                # Criar se não existir, embora init_db.py já garanta isso
+                config_atraso = Configuracao(
+                    chave='data_limite_pleitos_atrasados',
+                    valor=nova_data_str,
+                    tipo='date',
+                    descricao='Pleitos com Data Pendência anterior ou igual a esta data serão considerados atrasados.'
+                )
+                db.session.add(config_atraso)
+            db.session.commit()
+            flash(f'Data limite para pleitos atrasados atualizada para {nova_data_str}!', 'success')
+
+            user = User.query.filter_by(username=session['username']).first()
+            user_id = user.id if user else None
+            new_log = Log(
+                action="UPDATE_CONFIG_ATRASOS",
+                details=f"Data limite de pleitos atrasados alterada para: {nova_data_str}.",
+                user_id=user_id,
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
+            return redirect(url_for('admin_settings'))
+        except ValueError:
+            flash('Formato de data inválido. Por favor, use AAAA-MM-DD.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao salvar configuração: {str(e)}', 'danger')
+            logger.error(f"Erro ao salvar configuração de atrasos: {str(e)}")
+
+    return render_template('admin_settings.html', data_limite_atraso=data_limite_atraso)
+
 
 @app.route('/menu')
 @permission_required('can_view_all') # Todos que podem acessar o menu
@@ -392,7 +441,7 @@ def principal():
         if not session.get('can_upload_all'):
             flash('Você não tem permissão para carregar planilhas.', 'danger')
             return redirect(url_for('principal'))
-        
+
         session.pop('current_file', None)
         session.pop('filter_column', None)
         session.pop('filter_value', None)
@@ -417,7 +466,7 @@ def principal():
                 file.save(filepath)
                 session['current_file'] = filename
                 flash('Planilha carregada com sucesso!', 'success')
-                
+
                 user = User.query.filter_by(username=session['username']).first()
                 user_id = user.id if user else None
                 new_log = Log(
@@ -499,6 +548,18 @@ def principal():
             } for _, row in df.head(20).iterrows()]
             data_length = len(df)
 
+            # OBTENDO A DATA LIMITE DE ATRASO DO BANCO DE DADOS
+            config_atraso = Configuracao.query.filter_by(chave='data_limite_pleitos_atrasados').first()
+            if config_atraso and config_atraso.valor:
+                try:
+                    # Usar datetime.strptime para converter a string para objeto date
+                    threshold_date = datetime.strptime(config_atraso.valor, '%Y-%m-%d').date()
+                except ValueError:
+                    logger.warning(f"Data limite de atraso configurada ({config_atraso.valor}) inválida. Usando data atual.")
+                    threshold_date = datetime.now().date()
+            else:
+                threshold_date = datetime.now().date() # Fallback para hoje se não configurado
+
             consultores_base = set(df['Consultor'].unique().tolist())
             if contas_transicao:
                 transicao_df = pd.DataFrame(contas_transicao)
@@ -519,13 +580,13 @@ def principal():
                     'valor': format_currency_local(row.get('Valor', ''))
                 })
 
-            threshold_date = datetime.now()
             for consultor in consultores_total:
                 pleitos = resumo_dict[consultor]
                 df_consultor = df[df['Consultor'] == consultor]
                 clientes_unicos = df_consultor['Cliente'].nunique()
-                pendencia_dt = pd.to_datetime(df_consultor['Data Pendência'], format='%d/%m/%Y', errors='coerce')
-                
+                pendencia_dt = pd.to_datetime(df_consultor['Data Pendência'], format='%d/%m/%Y', errors='coerce').dt.date
+
+                # AQUI É ONDE USAMOS A threshold_date CONFIGURADA
                 mask_atraso = (pendencia_dt < threshold_date)
 
                 clientes_atrasados = df_consultor.loc[mask_atraso, 'Cliente'].unique()
@@ -563,18 +624,18 @@ def analisar():
     if 'username' not in session:
         flash('Faça login para acessar esta funcionalidade', 'danger')
         return redirect(url_for('login'))
-    
+
     if 'current_file' not in session:
         flash('Carregue uma planilha antes de filtrar', 'warning')
         return redirect(url_for('principal'))
-    
+
     filter_column = request.form.get('filter_column', 'Consultor')
     filter_value = request.form.get('filter_value', '').strip()
-    
+
     if not filter_value:
         flash('Digite um valor para filtrar', 'warning')
         return redirect(url_for('principal'))
-    
+
     user = User.query.filter_by(username=session['username']).first()
     user_id = user.id if user else None
     new_log = Log(
@@ -585,10 +646,10 @@ def analisar():
     )
     db.session.add(new_log)
     db.session.commit()
-    
+
     session['filter_column'] = filter_column
     session['filter_value'] = filter_value
-    
+
     flash('Filtro aplicado com sucesso!', 'success')
     return redirect(url_for('principal'))
 
@@ -597,7 +658,7 @@ def analisar():
 def limpar_filtro():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
+
     user = User.query.filter_by(username=session['username']).first()
     user_id = user.id if user else None
     new_log = Log(
@@ -619,7 +680,7 @@ def limpar_filtro():
 def exportar():
     if 'username' not in session or 'current_file' not in session:
         return redirect(url_for('login'))
-    
+
     try:
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
         df = pd.read_excel(filepath)
@@ -627,9 +688,9 @@ def exportar():
         filter_column = session.get('filter_column', '')
         filter_value = session.get('filter_value', '')
         df = preparar_base_excel(df, filter_column, filter_value)
-        
+
         export_filename = f"pleitos_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, index=False)
@@ -649,7 +710,7 @@ def exportar():
         )
         db.session.add(new_log)
         db.session.commit()
-        
+
         return send_file(
             output,
             download_name=export_filename,
@@ -666,30 +727,132 @@ def exportar():
 def show_logs():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
-    logs = Log.query.options(db.joinedload(Log.user)).order_by(Log.timestamp.desc()).all()
-    return render_template('logs.html', logs=logs)
+
+    # Coleta os parâmetros de filtro da URL
+    search_text = request.args.get('search_text', '').strip()
+    filter_user = request.args.get('filter_user', '').strip()
+    filter_action = request.args.get('filter_action', '').strip()
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+
+    # Inicia a query base
+    logs_query = Log.query.options(db.joinedload(Log.user)).order_by(Log.timestamp.desc())
+
+    # Aplica filtros com base nos parâmetros
+    if search_text:
+        # Busca em detalhes, ação, nome_cliente E AGORA CÓDIGO DE CONTROLE
+        logs_query = logs_query.filter(
+            db.or_(
+                Log.details.ilike(f'%{search_text}%'),
+                Log.action.ilike(f'%{search_text}%'),
+                Log.nome_cliente.ilike(f'%{search_text}%'),
+                Log.codigo_controle.ilike(f'%{search_text}%')
+            )
+        )
+
+    if filter_user:
+        # Filtra pelo username do usuário que realizou a ação
+        logs_query = logs_query.join(User).filter(User.username == filter_user)
+
+    if filter_action:
+        # Filtra pelo tipo de ação
+        logs_query = logs_query.filter(Log.action == filter_action)
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            logs_query = logs_query.filter(db.func.date(Log.timestamp) >= start_date)
+        except ValueError:
+            flash('Formato de "Data Início" inválido. Use AAAA-MM-DD.', 'danger')
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            logs_query = logs_query.filter(db.func.date(Log.timestamp) <= end_date)
+        except ValueError:
+            flash('Formato de "Data Fim" inválido. Use AAAA-MM-DD.', 'danger')
+
+    logs = logs_query.all()
+
+    # Coletar opções únicas para os dropdowns de filtro (do banco de dados)
+    unique_users = [user.username for user in User.query.with_entities(User.username).distinct().order_by(User.username).all()]
+    unique_actions = [action for action, in db.session.query(Log.action).distinct().order_by(Log.action).all()]
+
+
+    return render_template(
+        'logs.html',
+        logs=logs,
+        unique_users=unique_users,
+        unique_actions=unique_actions,
+        search_text=search_text,
+        filter_user=filter_user,
+        filter_action=filter_action,
+        start_date=start_date_str,
+        end_date=end_date_str
+    )
 
 @app.route('/exportar_logs')
 @permission_required('can_access_logs') # Permissão para exportar logs
 def export_logs():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
+
     try:
-        logs = Log.query.options(db.joinedload(Log.user)).order_by(Log.timestamp.desc()).all()
-        
+        # Passar os mesmos filtros para a exportação
+        search_text = request.args.get('search_text', '').strip()
+        filter_user = request.args.get('filter_user', '').strip()
+        filter_action = request.args.get('filter_action', '').strip()
+        start_date_str = request.args.get('start_date', '').strip()
+        end_date_str = request.args.get('end_date', '').strip()
+
+        logs_query = Log.query.options(db.joinedload(Log.user)).order_by(Log.timestamp.desc())
+
+        if search_text:
+            logs_query = logs_query.filter(
+                db.or_(
+                    Log.details.ilike(f'%{search_text}%'),
+                    Log.action.ilike(f'%{search_text}%'),
+                    Log.nome_cliente.ilike(f'%{search_text}%'),
+                    Log.codigo_controle.ilike(f'%{search_text}%')
+                )
+            )
+
+        if filter_user:
+            logs_query = logs_query.join(User).filter(User.username == filter_user)
+
+        if filter_action:
+            logs_query = logs_query.filter(Log.action == filter_action)
+
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                logs_query = logs_query.filter(db.func.date(Log.timestamp) >= start_date)
+            except ValueError:
+                # Se a data for inválida, não aplica o filtro, mas continua
+                pass
+
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                logs_query = logs_query.filter(db.func.date(Log.timestamp) <= end_date)
+            except ValueError:
+                # Se a data for inválida, não aplica o filtro, mas continua
+                pass
+
+        logs = logs_query.all()
+
+
         output = BytesIO()
         exportar_logs_excel(logs, output)
         output.seek(0)
-        
+
         filename = f"historico_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+
         user = User.query.filter_by(username=session['username']).first()
         user_id = user.id if user else None
         new_log = Log(
-            action="EXPORTAR_LOGS",
-            details=f"Histórico de logs exportado para '{filename}'.",
+            action="EXPORTAR_LOGS_FILTRADO",
+            details=f"Histórico de logs filtrado exportado para '{filename}'. Filtros: Texto='{search_text}', Usuário='{filter_user}', Ação='{filter_action}', Data Início='{start_date_str}', Data Fim='{end_date_str}'.",
             user_id=user_id,
             timestamp=datetime.utcnow()
         )
@@ -722,6 +885,22 @@ def calcular_multa():
         try:
             data_recebimento_str = request.form.get('data_recebimento')
             data_ativacao_str = request.form.get('data_ativacao')
+            valor_servicos_str = request.form.get('valor_servicos')
+            servico_rsfn = 'servico' in request.form and request.form['servico'] == 'rsfn'
+            
+            # NOVO: Captura o percentual de multa personalizado
+            multa_personalizada_str = request.form.get('multa_personalizada')
+            percentual_multa_personalizada = None
+            if multa_personalizada_str:
+                try:
+                    percentual_multa_personalizada = float(multa_personalizada_str) / 100.0 # Converte para fração
+                    if not (0 <= percentual_multa_personalizada <= 1): # Valida 0% a 100%
+                        flash('Percentual de multa personalizado deve ser entre 0 e 100.', 'danger')
+                        return redirect(url_for('calcular_multa'))
+                except ValueError:
+                    flash('Percentual de multa personalizado inválido.', 'danger')
+                    return redirect(url_for('calcular_multa'))
+
 
             if not data_recebimento_str or not data_ativacao_str:
                 flash('Preencha todas as datas!', 'warning')
@@ -738,7 +917,7 @@ def calcular_multa():
                 flash('A data de ativação não pode ser depois da data de recebimento da carta.', 'danger')
                 return redirect(url_for('calcular_multa'))
 
-            valor_servicos_str = request.form.get('valor_servicos')
+
             try:
                 valor_servicos = float(valor_servicos_str)
                 if valor_servicos <= 0:
@@ -748,15 +927,15 @@ def calcular_multa():
                 flash('Valor dos serviços inválido.', 'danger')
                 return redirect(url_for('calcular_multa'))
 
-            servico_rsfn = 'servico' in request.form and request.form['servico'] == 'rsfn'
             if servico_rsfn:
                 prazo_contrato = 1
-                percentual_multa = 0.50
+                percentual_multa = 0.50 # Fixo para RSFN
                 aviso_previo = 0
             else:
                 try:
                     prazo_contrato = int(request.form.get('prazo_contrato'))
-                    aviso_previo = int(request.form.get('aviso_custom') or request.form.get('aviso_previo'))
+                    aviso_previo_val = request.form.get('aviso_custom') or request.form.get('aviso_previo')
+                    aviso_previo = int(aviso_previo_val) if aviso_previo_val else 0 # Certifica que é um int
                 except (TypeError, ValueError):
                     flash('Prazo contratual e aviso prévio inválidos.', 'danger')
                     return redirect(url_for('calcular_multa'))
@@ -769,17 +948,25 @@ def calcular_multa():
             data_cancelamento = data_inicio_multa
             prazo_cumprido = (data_inicio_multa - data_ativacao).days
             prazo_faltante = prazo_total_dias - prazo_cumprido
-            valor_diario = valor_servicos / 30 if valor_servicos else 0
-            prazo_cumprido_anos = prazo_cumprido / 365
-            if servico_rsfn:
+            valor_diario = valor_servicos / 30 if valor_servicos else 0 # Usando 30 dias para valor diário
+
+            # LÓGICA DO PERCENTUAL DE MULTA
+            if percentual_multa_personalizada is not None:
+                percentual_multa = percentual_multa_personalizada # Usa o valor personalizado
+                percentual_multa_display = percentual_multa * 100 # Para exibir
+            elif servico_rsfn:
                 percentual_multa = 0.50
+                percentual_multa_display = 50
             else:
+                prazo_cumprido_anos = prazo_cumprido / 365.25 # Usar 365.25 para consistência com JS
                 if prazo_cumprido_anos < 1:
                     percentual_multa = 0.50
                 elif prazo_cumprido_anos < 2:
                     percentual_multa = 0.40
                 else:
                     percentual_multa = 0.30
+                percentual_multa_display = percentual_multa * 100 # Para exibir
+
 
             if servico_rsfn:
                 valor_multa = valor_servicos * 0.5
@@ -798,9 +985,10 @@ def calcular_multa():
             user_id = user.id if user else None
 
             log_action = "CALCULO_MULTA"
+            # Detalhes do log para incluir se foi personalizada a multa
             log_details = (
                 f"Serviço RSFN: {'Sim' if servico_rsfn else 'Não'} | "
-                f"Multa: {percentual_multa*100:.0f}% | "
+                f"Multa: {percentual_multa_display:.0f}% {'(personalizada)' if percentual_multa_personalizada is not None else '(automática)'} | "
                 f"Valor: R$ {valor_multa:.2f}"
             )
             new_log = Log(
@@ -831,7 +1019,7 @@ def calcular_multa():
                 prazo_faltante=prazo_faltante,
                 data_cancelamento=data_cancelamento.strftime('%d/%m/%Y'),
                 data_fim_contrato=data_fim_contrato.strftime('%d/%m/%Y'),
-                percentual_multa=percentual_multa*100,
+                percentual_multa=percentual_multa_display, # Passa o valor já em % para o template
                 valor_multa=valor_multa,
                 data_calculo=datetime.now().strftime('%d/%m/%Y às %H:%M'),
                 codigo_controle=codigo_controle,
@@ -855,100 +1043,114 @@ def calcular_multa():
     hoje = datetime.now().strftime('%Y-%m-%d')
     return render_template('calcular_multa.html', hoje=hoje)
 
+# app.py (trecho da rota /monitor_juridico)
+
+# ... (Seus imports existentes no topo do arquivo) ...
+# from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica
+# from datetime import datetime, timedelta, date
 
 @app.route('/monitor_juridico', methods=['GET', 'POST'])
 @permission_required('can_access_monitor_juridico') # Acesso ao monitor jurídico
 def monitor_juridico():
-    feriados = list(FERIADOS_2025)
-    atividades = []
-    liberacoes = []
-    erro = None
-    df = None
+    # Carrega todos os feriados do banco de dados
+    all_holidays_db = Feriado.query.order_by(Feriado.data).all()
+    feriados_for_calc = {f.data for f in all_holidays_db} # Set de objetos date
+    feriados_str = [f.format_date_br() for f in all_holidays_db] # Lista de strings para textarea
 
-    # === POST do MODAL de FERIADOS (sem upload de arquivo) ===
-    if request.method == 'POST' and 'feriados' in request.form and (not request.files or not request.files.get('file') or not request.files.get('file').filename):
-        # Verifica permissão para editar feriados
+    erro = None
+    
+    # === POST para SALVAR os feriados editados manualmente na textarea ===
+    if request.method == 'POST' and 'feriados_raw_input' in request.form:
+        # Lógica já implementada para salvar feriados no DB
         if not session.get('can_edit_monitor_juridico'):
             flash('Você não tem permissão para editar os feriados.', 'danger')
-            # Tenta carregar o arquivo existente se houver, para não perder os dados na tela
-            if 'current_juridico_file' in session:
-                try:
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_juridico_file'])
-                    df = pd.read_excel(filepath)
-                except Exception as e:
-                    erro = f"Erro ao ler o arquivo: {str(e)}"
-            return render_template(
-                'monitor_juridico.html',
-                atividades=atividades,
-                liberacoes=liberacoes,
-                feriados=feriados,
-                erro=erro
-            )
+            return redirect(url_for('monitor_juridico'))
 
-        raw = request.form.get('feriados')
-        if raw:
-            feriados = [x.strip() for x in raw.split(',') if x.strip()]
+        raw_input = request.form.get('feriados_raw_input')
+        feriados_para_salvar = []
+        parsed_dates = set()
+        errors_parsing = []
+
+        try:
+            # Limpa todos os feriados existentes no DB
+            db.session.query(Feriado).delete()
+            db.session.commit()
+            logger.info("Todos os feriados existentes foram removidos para atualização.")
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Erro ao limpar feriados antigos: {e}", "danger")
+            logger.error(f"Erro ao limpar feriados antigos: {e}")
+            return redirect(url_for('monitor_juridico'))
+
+        if raw_input:
+            for f_str in raw_input.split(','):
+                f_str = f_str.strip()
+                if f_str:
+                    try:
+                        f_date = datetime.strptime(f_str, "%d/%m/%Y").date()
+                        if f_date not in parsed_dates:
+                            # Localidade e tipo serão 'Manual' para feriados adicionados via textarea
+                            feriados_para_salvar.append(Feriado(data=f_date, nome="Feriado Manual", localidade="Manual", tipo="Manual"))
+                            parsed_dates.add(f_date)
+                    except ValueError:
+                        errors_parsing.append(f_str)
+                        logger.warning(f"Formato de feriado inválido ignorado: {f_str}")
+
+        if errors_parsing:
+            flash(f'Alguns feriados tinham formato inválido e foram ignorados: {", ".join(errors_parsing)}. Use DD/MM/AAAA.', 'warning')
         else:
-            feriados = list(FERIADOS_2025)
-        
-        user = User.query.filter_by(username=session['username']).first()
-        user_id = user.id if user else None
-        new_log = Log(
-            action="ATUALIZAR_FERIADOS",
-            details=f"Feriados atualizados para: {', '.join(feriados)}",
-            user_id=user_id,
-            timestamp=datetime.utcnow()
-        )
-        db.session.add(new_log)
-        db.session.commit()
+            flash('Feriados atualizados com sucesso!', 'success')
 
-        if 'current_juridico_file' in session:
-            try:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_juridico_file'])
-                df = pd.read_excel(filepath)
-            except Exception as e:
-                erro = f"Erro ao ler o arquivo: {str(e)}"
+        try:
+            for feriado_obj in feriados_para_salvar:
+                db.session.add(feriado_obj)
+            db.session.commit()
+            user = User.query.filter_by(username=session['username']).first()
+            user_id = user.id if user else None
+            new_log = Log(
+                action="ATUALIZAR_FERIADOS_MANUAL",
+                details=f"Feriados atualizados manualmente. Total: {len(feriados_para_salvar)}. Ignorados: {len(errors_parsing)}.",
+                user_id=user_id,
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(new_log)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Erro ao salvar os novos feriados: {e}", "danger")
+            logger.error(f"Erro ao salvar os novos feriados: {e}")
 
-    # === UPLOAD DE PLANILHA ===
+        # Recarrega os feriados do DB para garantir que a lista exibida está atualizada
+        all_holidays_db = Feriado.query.order_by(Feriado.data).all()
+        feriados_for_calc = {f.data for f in all_holidays_db}
+        feriados_str = [f.format_date_br() for f in all_holidays_db]
+
+    # === UPLOAD DE PLANILHA PARA ATIVIDADES JURÍDICAS ===
     elif request.method == 'POST' and 'file' in request.files and request.files['file'] and request.files['file'].filename:
         # Verifica permissão para upload
-        if not session.get('can_upload_all'): # Ou can_upload_monitor_juridico, se mais específico
+        if not session.get('can_upload_all'):
             flash('Você não tem permissão para carregar planilhas no Monitor Jurídico.', 'danger')
-            # Tenta carregar o arquivo existente se houver
-            if 'current_juridico_file' in session:
-                try:
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_juridico_file'])
-                    df = pd.read_excel(filepath)
-                except Exception as e:
-                    erro = f"Erro ao ler o arquivo: {str(e)}"
-            return render_template(
-                'monitor_juridico.html',
-                atividades=atividades,
-                liberacoes=liberacoes,
-                feriados=feriados,
-                erro=erro
-            )
+            return redirect(url_for('monitor_juridico'))
 
         file = request.files['file']
         try:
             df = pd.read_excel(file)
-            
-            # NOVO: VALIDAÇÃO DAS COLUNAS DA PLANILHA DE MONITOR JURÍDICO
+
+            # Alterado: 'Status' não é mais obrigatória
             required_columns_juridico = [
                 'Tipo', 'Assunto', 'Data de Criação', 'Proprietário', 'Criada por', 'Prioridade'
             ]
-            
-            # Normaliza os nomes das colunas do DataFrame para comparação case-insensitive e strip
-            df.columns = df.columns.str.strip() # Remove espaços em branco
+
+            df.columns = df.columns.str.strip()
             current_columns = df.columns.tolist()
-            
+
             missing_columns = [col for col in required_columns_juridico if col not in current_columns]
 
             if missing_columns:
                 error_msg = f'Planilha inválida para Monitor Jurídico. Colunas obrigatórias faltando: {", ".join(missing_columns)}.'
                 flash(error_msg, 'danger')
                 logger.error(f'Erro de validação ao carregar planilha no Monitor Jurídico: {error_msg}')
-                
+
                 user = User.query.filter_by(username=session['username']).first()
                 user_id = user.id if user else None
                 new_log = Log(
@@ -959,53 +1161,82 @@ def monitor_juridico():
                 )
                 db.session.add(new_log)
                 db.session.commit()
-                
-                # Se houver um arquivo anterior carregado, tentamos lê-lo para manter os dados na tela
-                if 'current_juridico_file' in session:
-                    try:
-                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_juridico_file'])
-                        df = pd.read_excel(filepath)
-                    except Exception as e:
-                        erro = f"Erro ao reler o arquivo anterior: {str(e)}"
-                else:
-                    df = None # Nenhuma planilha para processar se for a primeira tentativa
+                return redirect(url_for('monitor_juridico'))
 
-                # Retornar o template com o estado atual (vazio ou com dados anteriores)
-                return render_template(
-                    'monitor_juridico.html',
-                    atividades=atividades, # Estarão vazias ou com os dados da releitura
-                    liberacoes=liberacoes,
-                    feriados=feriados,
-                    erro=erro
-                )
+            # LIMPA AS ATIVIDADES EXISTENTES NO BANCO ANTES DE INSERIR AS NOVAS DA PLANILHA
+            try:
+                db.session.query(AtividadeJuridica).delete()
+                db.session.commit()
+                logger.info("Todas as atividades jurídicas existentes foram removidas para atualização via planilha.")
+            except Exception as e:
+                db.session.rollback()
+                flash(f"Erro ao limpar atividades jurídicas antigas: {e}", "danger")
+                logger.error(f"Erro ao limpar atividades jurídicas antigas: {e}")
+                return redirect(url_for('monitor_juridico'))
 
-            # Se todas as colunas obrigatórias estiverem presentes, procede com o salvamento e processamento
-            ext = os.path.splitext(file.filename)[1]
-            secure_name = f"{uuid.uuid4().hex}{ext}"
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            file.seek(0)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], secure_name))
-            session['current_juridico_file'] = secure_name
-            flash('Planilha de Monitor Jurídico carregada com sucesso!', 'success')
-            
+            # Processa e salva as novas atividades
+            atividades_salvas_count = 0
+            for index, row in df.iterrows():
+                try:
+                    data_criacao_excel = pd.to_datetime(row['Data de Criação'], dayfirst=True, errors='coerce').date()
+                    if pd.isna(data_criacao_excel):
+                        logger.warning(f"Linha {index+2} da planilha ignorada: Data de Criação inválida.")
+                        continue # Pula linhas com data inválida
+
+                    # Filtra apenas as linhas com o tipo 'Squad Contratação' OU 'Outros' (ANÁLISE DE CONTRATO ou SOLICITAÇÃO DE DOCUMENTO)
+                    # OU 'LIBERAÇÃO DE FLUXO' (Assunto)
+                    tipo_str = str(row.get('Tipo', '')).strip().lower()
+                    assunto_str = str(row.get('Assunto', '')).strip().lower()
+
+                    is_squad_contratacao = tipo_str == 'squad contratação'
+                    is_outros_condicionado = (tipo_str == 'outros' and
+                                              ('análise de contrato' in assunto_str or 'solicitação de documento' in assunto_str))
+                    is_liberacao_fluxo = 'liberação de fluxo' in assunto_str
+
+
+                    if is_squad_contratacao or is_outros_condicionado or is_liberacao_fluxo:
+                        # O status será padrão 'Pendente' se não existir na planilha ou for vazia
+                        # Se a coluna 'Status' existe, usa o valor dela, caso contrário, 'Pendente'
+                        status_from_excel = row.get('Status', 'Pendente') if 'Status' in df.columns else 'Pendente'
+
+                        nova_atividade = AtividadeJuridica(
+                            tipo=row.get('Tipo'),
+                            assunto=row.get('Assunto'),
+                            data_criacao=data_criacao_excel,
+                            proprietario=row.get('Proprietário'),
+                            criado_por=row.get('Criada por'),
+                            prioridade=row.get('Prioridade', 'Normal'), # Padrão 'Normal' se não houver
+                            status=status_from_excel # Usa o status da planilha ou 'Pendente'
+                        )
+                        db.session.add(nova_atividade)
+                        atividades_salvas_count += 1
+
+                except Exception as e:
+                    logger.error(f"Erro ao processar linha {index+2} da planilha de atividades: {e}")
+                    # Continua processando as outras linhas mesmo com erro em uma
+
+            db.session.commit()
+            flash(f'Planilha de Monitor Jurídico carregada e {atividades_salvas_count} atividades salvas no banco de dados!', 'success')
+
             user = User.query.filter_by(username=session['username']).first()
             user_id = user.id if user else None
             new_log = Log(
                 action="UPLOAD_JURIDICO",
-                details=f"Planilha '{file.filename}' carregada para Monitor Jurídico.",
+                details=f"Planilha '{file.filename}' carregada para Monitor Jurídico. {atividades_salvas_count} atividades salvas no DB.",
                 user_id=user_id,
                 timestamp=datetime.utcnow()
             )
             db.session.add(new_log)
             db.session.commit()
 
+            return redirect(url_for('monitor_juridico'))
+
         except Exception as e:
-            # Captura outros erros de leitura do Excel (formato inválido, etc.)
-            erro = f"Erro ao ler o arquivo: {str(e)}. Certifique-se de que é um arquivo Excel válido (.xlsx ou .xls)."
-            df = None
+            db.session.rollback()
+            erro = f"Erro ao ler/salvar o arquivo: {str(e)}. Certifique-se de que é um arquivo Excel válido (.xlsx ou .xls)."
             flash(f"Erro ao carregar planilha de Monitor Jurídico: {erro}", 'danger')
             logger.error(f"Erro inesperado ao carregar planilha no Monitor Jurídico: {erro}")
-            
+
             user = User.query.filter_by(username=session['username']).first()
             user_id = user.id if user else None
             new_log = Log(
@@ -1016,140 +1247,249 @@ def monitor_juridico():
             )
             db.session.add(new_log)
             db.session.commit()
+            return redirect(url_for('monitor_juridico'))
 
-            # Tenta reler o arquivo anterior se existir, para não deixar a tela vazia
-            if 'current_juridico_file' in session:
-                try:
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_juridico_file'])
-                    df = pd.read_excel(filepath)
-                except Exception as e:
-                    erro = f"Erro ao reler o arquivo anterior após erro: {str(e)}"
-            else:
-                df = None
+    # === GET normal ou atualização de página (CARREGAR DO BANCO DE DADOS) ===
+    # Agora, carregamos as atividades e liberações DIRETAMENTE DO BANCO
+    all_activities_from_db = AtividadeJuridica.query.all()
+    
+    atividades_geral = []
+    atividades_liberacao = []
 
-    # === GET normal ou atualização de página ===
-    # O processamento das atividades (atividades_geral, atividades_liberacao)
-    # só deve acontecer se df não for None e tiver sido validado.
-    # A estrutura atual já garante que df será None ou válido aqui, mas é bom ter em mente.
-    if df is not None and not df.empty: # Adicionado 'and not df.empty' para segurança
-        mask_squad = df['Tipo'].astype(str).str.contains('Squad Contratação', case=False, na=False)
-        mask_analise = df['Assunto'].astype(str).str.contains('AN[ÁA]LISE DE CONTRATO', case=False, na=False, regex=True)
-        mask_sol_doc = df['Assunto'].astype(str).str.contains('SOLICITA[ÇC][AÃ]O DE DOCUMENTO', case=False, na=False, regex=True)
-        mask_liberacao = df['Assunto'].astype(str).str.contains('LIBERA[ÇC][AÃ]O DE FLUXO', case=False, na=False, regex=True)
-        mask_outros_condicionado = ( df['Tipo'].astype(str).str.strip().str.lower() == 'outros') & (df['Assunto'].astype(str).str.contains(r'AN[ÁA]LISE DE CONTRATO|SOLICITA[ÇC][AÃ]O DE DOCUMENTO', case=False, regex=True))
-        mask_geral = (mask_squad & (mask_analise | mask_sol_doc)) | mask_outros_condicionado
-        atividades_geral = df[mask_geral].copy()
-        atividades_liberacao = df[mask_liberacao].copy()
+    def primeiro_nome(nome):
+        return str(nome).split()[0] if nome else ""
 
-        def primeiro_nome(nome):
-            return str(nome).split()[0] if nome else ""
+    for row_obj in all_activities_from_db:
+        # Define todas as variáveis necessárias a partir de row_obj
+        data_criacao = row_obj.data_criacao
+        assunto = row_obj.assunto
+        proprietario = primeiro_nome(row_obj.proprietario)
+        criado_por = primeiro_nome(row_obj.criado_por) # CORREÇÃO: Definição de criado_por
+        prioridade = row_obj.prioridade
+        current_status_db = row_obj.status
+        tipo_atividade = row_obj.tipo # CORREÇÃO: Definição de tipo_atividade
+        areas_pendentes_db = row_obj.areas_pendentes
+        
+        hoje = datetime.now().date()
+        dias = dias_uteis_entre_datas(data_criacao, hoje, feriados_for_calc)
 
-        atividades = []
-        for _, row in atividades_geral.iterrows():
-            try:
-                data_criacao = pd.to_datetime(row['Data de Criação'], dayfirst=True, errors='coerce').date()
-            except Exception:
-                data_criacao = None
-            assunto = row.get('Assunto', '')
-            proprietario = primeiro_nome(row.get('Proprietário', ''))
-            criador = primeiro_nome(row.get('Criada por', ''))
-            prioridade = row.get('Prioridade', '')
-            status = row.get('Status', '')
-            tipo_atividade = row.get('Tipo', '')
-            hoje = datetime.now().date()
-            if data_criacao:
-                dias = dias_uteis_entre_datas(data_criacao, hoje, feriados)
-            else:
-                dias = '-'
-            cor = ''
-            if str(status).lower() == 'concluída':
-                cor = 'table-success'
-            elif isinstance(dias, int) and dias >= 5:
-                cor = 'table-danger'
-            elif isinstance(dias, int) and dias == 4:
-                cor = 'table-warning'
-            elif isinstance(dias, int) and dias <= 1:
-                cor = 'table-primary'
-            atividades.append({
-                'data_criacao': data_criacao.strftime('%d/%m/%Y') if data_criacao else '',
-                'assunto': assunto,
-                'proprietario': proprietario,
-                'criador': criador,
-                'prioridade': prioridade,
-                'status': status,
-                'dias': dias,
-                'cor': cor,
-                'tipo': tipo_atividade
-            })
-        atividades = sorted(atividades, key=lambda x: datetime.strptime(x['data_criacao'], "%d/%m/%Y") if x['data_criacao'] else datetime.now())
+        cor = ''
+        status_display = current_status_db
+        
+        if str(current_status_db).lower() == 'concluída':
+            cor = 'table-success'
+            status_display = 'Concluída'
+        elif areas_pendentes_db and areas_pendentes_db.strip() and areas_pendentes_db.lower() != 'null':
+            cor = 'table-area-externa'
+            status_display = f"Pendente: {areas_pendentes_db.replace(',', ', ')}"
+        elif isinstance(dias, int) and dias >= 5:
+            cor = 'table-danger'
+            status_display = 'Atrasada'
+        elif isinstance(dias, int) and dias == 4:
+            cor = 'table-warning'
+            status_display = 'Quase atrasando'
+        elif isinstance(dias, int) and dias <= 1:
+            cor = 'table-primary'
+            status_display = 'Recém criada'
+        else:
+            status_display = 'Pendente'
 
-        liberacoes = []
-        for _, row in atividades_liberacao.iterrows():
-            try:
-                data_criacao = pd.to_datetime(row['Data de Criação'], dayfirst=True, errors='coerce').date()
-            except Exception:
-                data_criacao = None
-            assunto = row.get('Assunto', '')
-            proprietario = primeiro_nome(row.get('Proprietário', ''))
-            criador = primeiro_nome(row.get('Criada por', ''))
-            prioridade = row.get('Prioridade', '')
-            status = row.get('Status', '')
-            tipo_atividade = row.get('Tipo', '')
-            hoje = datetime.now().date()
-            if data_criacao:
-                dias = dias_uteis_entre_datas(data_criacao, hoje, feriados)
-            else:
-                dias = '-'
-            cor = 'table-secondary'
-            liberacoes.append({
-                'data_criacao': data_criacao.strftime('%d/%m/%Y') if data_criacao else '',
-                'assunto': assunto,
-                'proprietario': proprietario,
-                'criador': criador,
-                'prioridade': prioridade,
-                'status': status,
-                'dias': dias,
-                'cor': cor,
-                'tipo': tipo_atividade
-            })
+        atividade_dict = {
+            'id': row_obj.id,
+            'data_criacao': data_criacao.strftime('%d/%m/%Y'),
+            'assunto': assunto,
+            'proprietario': proprietario,
+            'criador': criado_por, # Usar a variável definida
+            'prioridade': prioridade,
+            'status': status_display,
+            'dias': dias,
+            'cor': cor,
+            'tipo': tipo_atividade, # Usar a variável definida
+            'original_status': current_status_db,
+            'areas_pendentes': areas_pendentes_db
+        }
+
+        if 'liberação de fluxo' in assunto.lower():
+            atividades_liberacao.append(atividade_dict)
+        else:
+            atividades_geral.append(atividade_dict)
+            
+    # Ordena atividades gerais e liberações pela data de criação
+    atividades_geral = sorted(atividades_geral, key=lambda x: datetime.strptime(x['data_criacao'], "%d/%m/%Y"), reverse=False)
+    atividades_liberacao = sorted(atividades_liberacao, key=lambda x: datetime.strptime(x['data_criacao'], "%d/%m/%Y"), reverse=False)
+
 
     return render_template(
         'monitor_juridico.html',
-        atividades=atividades,
-        liberacoes=liberacoes,
-        feriados=feriados,
-        erro=erro
+        atividades=atividades_geral,
+        liberacoes=atividades_liberacao,
+        feriados=feriados_str,
+        erro=erro,
+        now=datetime.now()
     )
 
-@app.route('/monitor_juridico/status/<int:idx>', methods=['POST'])
-@permission_required('can_edit_monitor_juridico') # Permissão para ações de edição no Monitor Jurídico
-def marcar_concluida(idx):
-    user = User.query.filter_by(username=session['username']).first()
-    user_id = user.id if user else None
-    new_log = Log(
-        action="ATIVIDADE_CONCLUIDA",
-        details=f"Atividade {idx} marcada como concluída no Monitor Jurídico (frontend-only).",
-        user_id=user_id,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(new_log)
-    db.session.commit()
-    return jsonify({'success': True})
+# Rota para buscar feriados em JSON para o modal (para recarregar a textarea)
+@app.route('/monitor_juridico/get_holidays_json', methods=['GET'])
+@permission_required('can_access_monitor_juridico')
+def get_holidays_json():
+    holidays = Feriado.query.order_by(Feriado.data).all()
+    holidays_data = []
+    for h in holidays:
+        holidays_data.append({
+            'date': h.data.strftime('%Y-%m-%d'),
+            'date_formatted': h.format_date_br(),
+            'name': h.nome,
+            'location': h.localidade,
+            'type': h.tipo
+        })
+    return jsonify({'success': True, 'holidays': holidays_data})
 
-@app.route('/monitor_juridico/prioridade/<int:idx>', methods=['POST'])
-@permission_required('can_edit_monitor_juridico') # Permissão para ações de edição no Monitor Jurídico
-def solicitar_prioridade(idx):
+# Rota para atualização de atividades jurídicas via AJAX
+@app.route('/monitor_juridico/update_atividade/<int:atividade_id>', methods=['POST'])
+@permission_required('can_edit_monitor_juridico')
+def update_atividade_juridica(atividade_id):
+    atividade = AtividadeJuridica.query.get(atividade_id)
+    if not atividade:
+        return jsonify({'success': False, 'message': 'Atividade não encontrada.'}), 404
+
+    data = request.get_json()
+    action_type = data.get('action_type')
+    new_value = data.get('new_value')
+
     user = User.query.filter_by(username=session['username']).first()
     user_id = user.id if user else None
-    new_log = Log(
-        action="SOLICITAR_PRIORIDADE",
-        details=f"Prioridade solicitada para atividade {idx} no Monitor Jurídico (frontend-only).",
-        user_id=user_id,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(new_log)
-    db.session.commit()
-    return jsonify({'success': True})
+    log_details = f"Atividade ID {atividade_id} (Assunto: {atividade.assunto}). "
+
+    try:
+        if action_type == 'status':
+            old_status = atividade.status
+            atividade.status = new_value
+            atividade.data_ultimo_status = datetime.utcnow()
+            # Se status for "Concluída", limpa áreas pendentes
+            if new_value == 'Concluída':
+                atividade.areas_pendentes = None
+            log_details += f"Status alterado de '{old_status}' para '{new_value}'."
+        elif action_type == 'prioridade':
+            old_prioridade = atividade.prioridade
+            atividade.prioridade = new_value
+            log_details += f"Prioridade alterada de '{old_prioridade}' para '{new_value}'."
+        elif action_type == 'areas_pendentes':
+            old_areas = atividade.areas_pendentes
+            atividade.areas_pendentes = new_value
+            # Se áreas pendentes são definidas, o status principal pode ser ajustado
+            if new_value and new_value != 'null': # Se está definindo áreas pendentes, o status vira "Pendente com Área"
+                atividade.status = 'Pendente com Área'
+            else: # Se áreas pendentes são removidas, o status pode voltar para "Pendente" ou original
+                if atividade.status == 'Pendente com Área': # Só muda se era "Pendente com Área"
+                    atividade.status = 'Pendente' # Volta para pendente padrão
+            atividade.data_ultimo_status = datetime.utcnow()
+            log_details += f"Áreas pendentes alteradas de '{old_areas}' para '{new_value}'. Status atualizado para '{atividade.status}'."
+        else:
+            return jsonify({'success': False, 'message': 'Tipo de ação inválido.'}), 400
+
+        db.session.commit()
+
+        new_log = Log(action=f"UPDATE_JURIDICO_{action_type.upper()}", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Atividade atualizada com sucesso!'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao atualizar atividade jurídica ID {atividade_id} (action: {action_type}): {e}")
+        return jsonify({'success': False, 'message': f'Erro ao atualizar atividade: {e}'}), 500
+
+# Rota para buscar feriados da API
+@app.route('/fetch_holidays_api', methods=['GET'])
+@permission_required('can_edit_monitor_juridico')
+def fetch_holidays_api():
+    ano = request.args.get('ano', datetime.now().year, type=int)
+    estado = request.args.get('estado', '').upper()
+    municipio = request.args.get('municipio', '').title()
+
+    feriados_encontrados = []
+
+    url_nacionais = f'https://brasilapi.com.br/api/feriados/v1/{ano}'
+    try:
+        response = requests.get(url_nacionais, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        for f in data:
+            feriados_encontrados.append({
+                'date': f['date'],
+                'name': f['name'],
+                'type': f['type'],
+                'location': 'Nacional'
+            })
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erro ao buscar feriados nacionais da API: {e}")
+        pass
+
+    return jsonify({
+        'success': True,
+        'holidays': feriados_encontrados,
+        'message': f"Feriados para {ano} encontrados. (Busca principal por feriados nacionais, via BrasilAPI)."
+    })
+
+# Rota para adicionar/remover feriados via AJAX
+@app.route('/manage_holiday_db', methods=['POST'])
+@permission_required('can_edit_monitor_juridico')
+def manage_holiday_db():
+    action = request.json.get('action')
+    holiday_data = request.json.get('holiday')
+
+    user = User.query.filter_by(username=session['username']).first()
+    user_id = user.id if user else None
+
+    try:
+        if action == 'add':
+            f_date = datetime.strptime(holiday_data['date'], '%Y-%m-%d').date()
+            existing_holiday = Feriado.query.filter_by(data=f_date, localidade=holiday_data.get('location', 'Nacional')).first()
+            if existing_holiday:
+                return jsonify({'success': False, 'message': 'Feriado já existe para esta data e localidade.'})
+
+            new_holiday = Feriado(
+                data=f_date,
+                nome=holiday_data.get('name', 'Feriado'),
+                localidade=holiday_data.get('location', 'Nacional'),
+                tipo=holiday_data.get('type', 'Desconhecido')
+            )
+            db.session.add(new_holiday)
+            db.session.commit()
+
+            log_details = f"Adicionado feriado: {new_holiday.format_date_br()} ({new_holiday.nome}) em {new_holiday.localidade}."
+            new_log = Log(action="ADD_FERIADO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
+            db.session.add(new_log)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Feriado adicionado com sucesso!'})
+
+        elif action == 'remove':
+            f_date = datetime.strptime(holiday_data['date'], '%Y-%m-%d').date()
+            feriado_to_delete = Feriado.query.filter_by(data=f_date, localidade=holiday_data.get('location', 'Nacional')).first()
+
+            if not feriado_to_delete:
+                return jsonify({'success': False, 'message': 'Feriado não encontrado para remoção.'})
+
+            db.session.delete(feriado_to_delete)
+            db.session.commit()
+
+            log_details = f"Removido feriado: {feriado_to_delete.format_date_br()} ({feriado_to_delete.nome}) em {feriado_to_delete.localidade}."
+            new_log = Log(action="REMOVE_FERIADO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
+            db.session.add(new_log)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Feriado removido com sucesso!'})
+
+        else:
+            return jsonify({'success': False, 'message': 'Ação inválida.'})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao gerenciar feriado no DB (ação: {action}): {e}")
+        return jsonify({'success': False, 'message': f'Erro ao processar feriado: {e}'})
+
 
 MESES_PADRAO = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -1226,7 +1566,7 @@ def sla_dashboard():
             if not session.get('can_edit_sla'): # Ou can_edit_all
                 flash('Você não tem permissão para limpar os resultados do Dashboard SLA.', 'danger')
                 return redirect(url_for('sla_dashboard'))
-            
+
             session['sla_resultados'] = []
             resultados = []
             flash('Resultados limpos!', 'info')
@@ -1731,10 +2071,7 @@ def consulta_cnpj():
 # ============= INICIALIZAÇÃO =============
 if __name__ == '__main__':
     with app.app_context():
-        # Esta linha garante que o db.create_all() seja executado caso app.py seja rodado diretamente
-        # antes de init_db.py, o que pode causar erros em um ambiente real.
-        # O ideal é SEMPRE rodar init_db.py primeiro para setup inicial.
-        db.create_all() 
+        db.create_all()
         print("A aplicação está inicializando. Garanta que 'python init_db.py' foi executado para configurar o banco de dados e usuários.")
 
     app.run(host='0.0.0.0', port=10000, debug=True)

@@ -8,9 +8,12 @@
 <div class="card mt-3">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h2 class="mb-0">Monitor Jurídico</h2>
-        <button type="button" class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#modalFeriados" style="min-width:140px;">
-            <i class="bi bi-calendar-event"></i> Ver/Editar Feriados
-        </button>
+        <div class="d-flex align-items-center">
+            {# REMOVIDO: Botão Finalizar Daily #}
+            <button type="button" class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#modalFeriados" style="min-width:140px;">
+                <i class="bi bi-calendar-event"></i> Ver/Editar Feriados
+            </button>
+        </div>
     </div>
     <div class="card-body">
         {% if erro %}
@@ -49,7 +52,7 @@
                 </thead>
                 <tbody id="tbodyAtividades">
                     {% for a in atividades %}
-                        <tr class="{{ a.cor }}" data-original-class="{{ a.cor }}">
+                        <tr class="{{ a.cor }}" data-original-class="{{ a.cor }}" data-id="{{ a.id }}" data-dias="{{ a.dias }}"> {# Adicionado data-dias #}
                             <td>{{ a.data_criacao }}</td>
                             <td>{{ a.assunto }}</td>
                             <td>
@@ -66,7 +69,7 @@
                             <td>{{ a.proprietario }}</td>
                             <td>{{ a.criador }}</td>
                             <td>
-                                <span class="prioridade-label">{% if a.prioridade == 'Solicitada' %}<b class="text-danger">Solicitada</b>{% endif %}</span>
+                                <span class="prioridade-label">{% if a.prioridade == 'Solicitada' %}<b class="text-danger">Solicitada</b>{% else %}{{ a.prioridade or 'Normal'}}{% endif %}</span>
                                 <button type="button" class="btn btn-warning btn-sm btn-prioridade ms-2" title="Priorizar"
                                         {% if a.prioridade == 'Solicitada' %}style="display:none;"{% endif %}>
                                     <i class="bi bi-arrow-up"></i>
@@ -78,20 +81,26 @@
                             </td>
                             <td>{{ a.dias }}</td>
                             <td>
-                                <span class="span-status">{% if a.status.lower() == 'concluída' %}Concluída{% else %}{{ a.status or '' }}{% endif %}</span>
+                                <span class="span-status">{% if a.original_status.lower() == 'concluída' %}Concluída{% elif a.areas_pendentes and a.areas_pendentes != 'null' %}Pendente: {{ a.areas_pendentes.replace(',', ', ') }}{% else %}{{ a.original_status or '' }}{% endif %}</span>
+                                <span class="badges-area ms-1">
+                                    {% if a.areas_pendentes and a.areas_pendentes != 'null' %}
+                                        {% for area in a.areas_pendentes.split(',') %}
+                                            <span class="badge bg-area ms-1 mb-1" data-area="{{ area.strip() }}">{{ area.strip() }}</span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </span>
                                 <button type="button" class="btn btn-success btn-sm btn-status ms-2" title="Marcar como concluída"
-                                    {% if a.status.lower() == 'concluída' %}style="display:none;"{% endif %}>
+                                    {% if a.original_status.lower() == 'concluída' %}style="display:none;"{% endif %}>
                                     <i class="bi bi-check2"></i>
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm btn-desstatus ms-2" title="Desmarcar concluída"
-                                    {% if a.status.lower() != 'concluída' %}style="display:none;"{% endif %}>
+                                    {% if a.original_status.lower() != 'concluída' %}style="display:none;"{% endif %}>
                                     <i class="bi bi-x"></i>
                                 </button>
                                 <button type="button" class="btn btn-outline-area btn-outraarea ms-2" title="Marcar como pendente com outra área"
-                                    {% if a.status.lower() == 'concluída' %}style="display:none;"{% endif %}>
+                                    {% if a.original_status.lower() == 'concluída' %}style="display:none;"{% endif %}>
                                     <i class="bi bi-share"></i>
                                 </button>
-                                <span class="badges-area ms-1"></span>
                             </td>
                         </tr>
                     {% endfor %}
@@ -101,7 +110,7 @@
         {% if liberacoes %}
         <h4 class="mt-4 mb-2">Liberações de Fluxo</h4>
         <div class="table-responsive">
-            <table class="table table-bordered align-middle">
+            <table class="table table-bordered align-middle" id="tabelaLiberacoes">
                 <thead class="table-light">
                     <tr>
                         <th>Data de Criação</th>
@@ -114,9 +123,9 @@
                         <th>Status</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tbodyLiberacoes">
                     {% for l in liberacoes %}
-                        <tr class="{{ l.cor }}">
+                        <tr class="{{ l.cor }}" data-original-class="{{ l.cor }}" data-id="{{ l.id }}" data-dias="{{ l.dias }}"> {# Adicionado data-dias #}
                             <td>{{ l.data_criacao }}</td>
                             <td>{{ l.assunto }}</td>
                             <td>
@@ -132,9 +141,19 @@
                             </td>
                             <td>{{ l.proprietario }}</td>
                             <td>{{ l.criador }}</td>
-                            <td>{{ l.prioridade }}</td>
+                            <td><span class="prioridade-label">{{ l.prioridade or 'Normal'}}</span></td>
                             <td>{{ l.dias }}</td>
-                            <td>{{ l.status }}</td>
+                            <td>
+                                <span class="span-status">{% if l.original_status.lower() == 'concluída' %}Concluída{% elif l.areas_pendentes and l.areas_pendentes != 'null' %}Pendente: {{ l.areas_pendentes.replace(',', ', ') }}{% else %}{{ l.original_status or '' }}{% endif %}</span>
+                                <span class="badges-area ms-1">
+                                    {% if l.areas_pendentes and l.areas_pendentes != 'null' %}
+                                        {% for area in l.areas_pendentes.split(',') %}
+                                            <span class="badge bg-area ms-1 mb-1" data-area="{{ area.strip() }}">{{ area.strip() }}</span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </span>
+                                {# Botões de ação para liberações podem ser implementados de forma similar se necessário #}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -179,101 +198,295 @@
   </div>
 </div>
 
+{# NOVO MODAL DE FERIADOS #}
 <div class="modal fade" id="modalFeriados" tabindex="-1" aria-labelledby="modalFeriadosLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
-    <form method="post">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="modalFeriadosLabel"><i class="bi bi-calendar-event"></i> Feriados considerados</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-        </div>
-        <div class="modal-body">
-          <p>Edite/remova os feriados (formato: dd/mm/yyyy). Separe por vírgula se desejar incluir vários:</p>
-          <textarea class="form-control" name="feriados" rows="4">{{ feriados|join(', ') }}</textarea>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Salvar</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalFeriadosLabel"><i class="bi bi-calendar-event"></i> Feriados considerados</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs mb-3" id="holidayTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="list-tab" data-bs-toggle="tab" data-bs-target="#holidayList" type="button" role="tab" aria-controls="holidayList" aria-selected="true">Feriados Salvos</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#holidayAdd" type="button" role="tab" aria-controls="holidayAdd" aria-selected="false">Adicionar Feriado</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="fetch-tab" data-bs-toggle="tab" data-bs-target="#holidayFetch" type="button" role="tab" aria-controls="holidayFetch" aria-selected="false">Buscar da API</button>
+          </li>
+        </ul>
+        <div class="tab-content" id="holidayTabContent">
+          {# TAB Feriados Salvos #}
+          <div class="tab-pane fade show active" id="holidayList" role="tabpanel" aria-labelledby="list-tab">
+            <p>Feriados atualmente registrados no sistema:</p>
+            <textarea class="form-control mb-3" id="feriadosRawInput" name="feriados_raw_input" rows="7"
+                      placeholder="Datas no formato DD/MM/AAAA, separadas por vírgula. Ex: 01/01/2025, 25/01/2025">{{ feriados|join(', ') }}</textarea>
+            <small class="form-text text-muted">Edite diretamente acima ou use a aba "Adicionar Feriado" para maior controle. Ao salvar, a lista será atualizada.</small>
+          </div>
+
+          {# TAB Adicionar Feriado Manualmente #}
+          <div class="tab-pane fade" id="holidayAdd" role="tabpanel" aria-labelledby="add-tab">
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label for="manualHolidayDate" class="form-label">Data:</label>
+                <input type="date" class="form-control" id="manualHolidayDate" required>
+              </div>
+              <div class="col-md-6">
+                <label for="manualHolidayName" class="form-label">Nome:</label>
+                <input type="text" class="form-control" id="manualHolidayName" placeholder="Ex: Carnaval">
+              </div>
+              <div class="col-md-6">
+                <label for="manualHolidayLocation" class="form-label">Localidade (opcional):</label>
+                <input type="text" class="form-control" id="manualHolidayLocation" placeholder="Ex: SP, RJ, Nacional">
+              </div>
+              <div class="col-md-6">
+                <label for="manualHolidayType" class="form-label">Tipo (opcional):</label>
+                <input type="text" class="form-control" id="manualHolidayType" placeholder="Ex: Estadual, Municipal">
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary" id="btnAddManualHoliday"><i class="bi bi-plus-circle"></i> Adicionar Manualmente</button>
+          </div>
+
+          {# TAB Buscar da API #}
+          <div class="tab-pane fade" id="holidayFetch" role="tabpanel" aria-labelledby="fetch-tab">
+            <div class="row g-2 mb-3">
+              <div class="col-md-4">
+                <label for="apiFetchYear" class="form-label">Ano:</label>
+                <input type="number" class="form-control" id="apiFetchYear" value="{{ now.year }}" min="2000" max="2099">
+              </div>
+              <div class="col-md-4">
+                <label for="apiFetchState" class="form-label">Estado (UF, opcional):</label>
+                <input type="text" class="form-control" id="apiFetchState" placeholder="Ex: SP, RJ" maxlength="2">
+              </div>
+              <div class="col-md-4">
+                <label for="apiFetchCity" class="form-label">Município (opcional):</label>
+                <input type="text" class="form-control" id="apiFetchCity" placeholder="Ex: Sao Paulo">
+              </div>
+            </div>
+            <button type="button" class="btn btn-info" id="btnFetchHolidays"><i class="bi bi-cloud-download"></i> Buscar Feriados da API</button>
+            <div id="apiHolidaysResult" class="mt-3">
+              {# Feriados da API serão listados aqui #}
+            </div>
+          </div>
         </div>
       </div>
-    </form>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary" id="btnSaveFeriadosForm" form="formFeriadosSubmit">Salvar Todas as Mudanças</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
   </div>
 </div>
+{# Formulário para submeter a textarea. Fica fora do modal mas é acionado pelo botão de salvar #}
+<form method="post" id="formFeriadosSubmit" style="display:none;">
+    <input type="hidden" name="feriados_raw_input" id="hiddenFeriadosRawInput">
+</form>
+
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+    // === LÓGICA PARA OS BOTÕES DE AÇÃO NA TABELA ===
+    // Função auxiliar para determinar a classe de cor baseada nos dias
+    function getOriginalColorClass(dias) {
+        if (dias === '-') return ''; // Se não há dias, não há cor específica
+        dias = parseInt(dias);
+        if (dias >= 5) {
+            return 'table-danger';
+        } else if (dias === 4) {
+            return 'table-warning';
+        } else if (dias <= 1) {
+            return 'table-primary';
+        }
+        return ''; // Retorna vazio se não se encaixa em nenhuma categoria colorida
+    }
+
+    // Status Concluída
     document.querySelectorAll(".btn-status").forEach(function (btn) {
         btn.addEventListener("click", function () {
             var tr = btn.closest("tr");
-            tr.classList.remove("atrasada", "quase-atrasando", "recem-criada");
-            tr.classList.add("concluida", "table-success");
-            var spanStatus = tr.querySelector('.span-status');
-            if (spanStatus) spanStatus.textContent = "Concluída";
-            btn.style.display = "none";
-            tr.querySelector('.btn-desstatus').style.display = "";
-            tr.querySelector('.btn-outraarea').style.display = "none";
-            var badgesArea = tr.querySelector('.badges-area');
-            if (badgesArea) badgesArea.innerHTML = "";
-        });
-    });
-    document.querySelectorAll(".btn-desstatus").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            var tr = btn.closest("tr");
-            tr.classList.remove("concluida", "table-success");
-            tr.className = tr.getAttribute("data-original-class");
-            var spanStatus = tr.querySelector('.span-status');
-            if (spanStatus) spanStatus.textContent = "";
-            btn.style.display = "none";
-            tr.querySelector('.btn-status').style.display = "";
-            tr.querySelector('.btn-outraarea').style.display = "";
-        });
-    });
-    document.querySelectorAll(".btn-prioridade").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            var tr = btn.closest("tr");
-            tr.querySelector('.prioridade-label').innerHTML = "<b class='text-danger'>Solicitada</b>";
-            btn.style.display = "none";
-            tr.querySelector('.btn-desprioridade').style.display = "";
-            tr.parentNode.insertBefore(tr, tr.parentNode.firstChild);
-            tr.style.background = "#fffbe4";
-            setTimeout(function(){ tr.style.background = ""; }, 1200);
-        });
-    });
-    document.querySelectorAll(".btn-desprioridade").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-            var tr = btn.closest("tr");
-            tr.querySelector('.prioridade-label').innerHTML = "";
-            btn.style.display = "none";
-            tr.querySelector('.btn-prioridade').style.display = "";
+            var atividadeId = tr.dataset.id; // Pega o ID da atividade
+            fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_type: 'status', new_value: 'Concluída' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Atividade marcada como Concluída!', 'success');
+                    // Atualiza o frontend após sucesso no backend
+                    tr.classList.remove("atrasada", "quase-atrasando", "recem-criada", "table-area-externa"); // Remove pendência de área também
+                    tr.classList.add("concluida", "table-success");
+                    var spanStatus = tr.querySelector('.span-status');
+                    if (spanStatus) spanStatus.textContent = "Concluída";
+                    btn.style.display = "none";
+                    tr.querySelector('.btn-desstatus').style.display = "";
+                    tr.querySelector('.btn-outraarea').style.display = "none"; // Esconde o botão de "outra área"
+                    var badgesArea = tr.querySelector('.badges-area');
+                    if (badgesArea) badgesArea.innerHTML = ""; // Remove badges de área
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao marcar como concluída:', error);
+                showToast('Erro de comunicação com o servidor.', 'danger');
+            });
         });
     });
 
-    var trSelecionada = null;
-    var areasTemp = [];
+    // Desmarcar Concluída
+    document.querySelectorAll(".btn-desstatus").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            var atividadeId = tr.dataset.id;
+            fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_type: 'status', new_value: 'Pendente' }) // Volta para Pendente padrão
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Atividade desmarcada como Concluída!', 'info');
+                    // Atualiza o frontend
+                    tr.classList.remove("concluida", "table-success", "table-area-externa"); // Remove area externa tb
+                    
+                    // Re-aplica a cor original baseada nos dias
+                    const dias = tr.dataset.dias; // Pega os dias do data-dias
+                    const originalColorClass = getOriginalColorClass(dias); // Usa a nova função
+                    if (originalColorClass) {
+                        tr.classList.add(originalColorClass);
+                    } else {
+                        // Se não tem cor original, garante que não tem classes de cor antigas
+                        tr.classList.remove('table-danger', 'table-warning', 'table-primary', 'table-secondary');
+                    }
+
+                    var spanStatus = tr.querySelector('.span-status');
+                    if (spanStatus) spanStatus.textContent = "Pendente"; // Volta para Pendente no texto
+                    btn.style.display = "none";
+                    tr.querySelector('.btn-status').style.display = "";
+                    tr.querySelector('.btn-outraarea').style.display = "";
+                    // Para reexibir áreas pendentes (se houver), você precisaria do valor original ou de outra chamada AJAX
+                    // por enquanto, ele apenas volta para o status "Pendente" sem as áreas.
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao desmarcar concluída:', error);
+                showToast('Erro de comunicação com o servidor.', 'danger');
+            });
+        });
+    });
+
+    // Priorizar
+    document.querySelectorAll(".btn-prioridade").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            var atividadeId = tr.dataset.id;
+            fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_type: 'prioridade', new_value: 'Solicitada' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Prioridade solicitada!', 'success');
+                    // Atualiza o frontend
+                    tr.querySelector('.prioridade-label').innerHTML = "<b class='text-danger'>Solicitada</b>";
+                    btn.style.display = "none";
+                    tr.querySelector('.btn-desprioridade').style.display = "";
+                    const tbody = tr.closest('tbody');
+                    if (tbody) {
+                        tbody.insertBefore(tr, tbody.firstChild); // Move para o topo da tabela
+                    }
+                    tr.style.background = "#fffbe4";
+                    setTimeout(function(){ tr.style.background = ""; }, 1200);
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao priorizar:', error);
+                showToast('Erro de comunicação com o servidor.', 'danger');
+            });
+        });
+    });
+
+    // Remover Prioridade
+    document.querySelectorAll(".btn-desprioridade").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var tr = btn.closest("tr");
+            var atividadeId = tr.dataset.id;
+            fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action_type: 'prioridade', new_value: 'Normal' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Prioridade removida!', 'info');
+                    // Atualiza o frontend
+                    tr.querySelector('.prioridade-label').innerHTML = "Normal"; // Volta para "Normal" ou vazio
+                    btn.style.display = "none";
+                    tr.querySelector('.btn-prioridade').style.display = "";
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao remover prioridade:', error);
+                showToast('Erro de comunicação com o servidor.', 'danger');
+            });
+        });
+    });
+
+    // Lógica para Pendente com Outra Área (Modal)
+    let trSelecionada = null;
+    let areasTemp = []; // Armazena as áreas temporariamente para o modal
+    const modalSelecionarArea = new bootstrap.Modal(document.getElementById('modalSelecionarArea'));
+
     document.querySelectorAll(".btn-outraarea").forEach(function(btn) {
         btn.addEventListener("click", function() {
             trSelecionada = btn.closest("tr");
-            areasTemp = [];
+            // Se já tem status concluída, impede abrir o modal
+            if (trSelecionada.classList.contains('concluida')) {
+                showToast('Atividades concluídas não permitem pendências em outras áreas.', 'warning');
+                return;
+            }
+
+            areasTemp = []; // Limpa array temporário
             var badgesArea = trSelecionada.querySelector('.badges-area');
             if (badgesArea && badgesArea.children.length > 0) {
-                for (let badge of badgesArea.querySelectorAll('.badge.bg-area')) {
-                    areasTemp.push(badge.getAttribute('data-area'));
-                }
+                // Preenche areasTemp com as áreas já existentes (remove "Pendente: ")
+                Array.from(badgesArea.querySelectorAll('.badge.bg-area')).forEach(badge => {
+                    const areaText = badge.textContent.trim().replace('Pendente: ', '');
+                    areasTemp.push(areaText);
+                });
             }
-            atualizarAreasSelecionadas();
-            var modal = new bootstrap.Modal(document.getElementById('modalSelecionarArea'));
-            modal.show();
+            atualizarAreasSelecionadas(); // Atualiza o display no modal
+            modalSelecionarArea.show(); // Abre o modal
         });
     });
 
     document.getElementById('btnAddArea').addEventListener("click", function(){
         var area = document.getElementById('selectArea').value;
-        if (areasTemp.length < 4 && !areasTemp.includes(area)) {
+        if (areasTemp.length < 4 && !areasTemp.includes(area)) { // Limite de 4 áreas
             areasTemp.push(area);
             atualizarAreasSelecionadas();
+        } else if (areasTemp.includes(area)) {
+            showToast('Esta área já foi adicionada.', 'warning');
+        } else if (areasTemp.length >= 4) {
+            showToast('Máximo de 4 áreas por pendência.', 'warning');
         }
     });
 
@@ -281,7 +494,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var div = document.getElementById('areasSelecionadas');
         var select = document.getElementById('selectArea');
         var btnAdd = document.getElementById('btnAddArea');
-        div.innerHTML = "";
+        div.innerHTML = ""; // Limpa as áreas exibidas
         if (areasTemp.length >= 4) {
             select.disabled = true;
             btnAdd.disabled = true;
@@ -293,37 +506,286 @@ document.addEventListener("DOMContentLoaded", function () {
             var tag = document.createElement("span");
             tag.className = "badge bg-area ms-1 mb-1";
             tag.setAttribute('data-area', area);
-            tag.innerHTML = area + " <button type='button' class='btn btn-xs btn-link text-white ms-1 btn-remover-area' data-idx='"+idx+"' style='padding:0 3px;font-size:14px;line-height:1;'><i class='bi bi-x'></i></button>";
+            tag.innerHTML = area + ` <button type='button' class='btn btn-xs btn-link text-white ms-1 btn-remover-area' data-idx='${idx}' style='padding:0 3px;font-size:14px;line-height:1;'><i class='bi bi-x'></i></button>`;
             div.appendChild(tag);
         });
         div.querySelectorAll(".btn-remover-area").forEach(function(btn){
             btn.onclick = function() {
                 var idx = parseInt(btn.getAttribute("data-idx"));
-                areasTemp.splice(idx, 1);
-                atualizarAreasSelecionadas();
+                areasTemp.splice(idx, 1); // Remove a área do array temporário
+                atualizarAreasSelecionadas(); // Re-renderiza a lista
             };
         });
     }
 
     document.getElementById('btnAplicarArea').addEventListener("click", function() {
         if (!trSelecionada) return;
-        var badgesArea = trSelecionada.querySelector('.badges-area');
-        badgesArea.innerHTML = "";
-        if (areasTemp.length > 0) {
-            areasTemp.forEach(function(area, i){
-                var badge = document.createElement("span");
-                badge.className = "badge bg-area ms-1 mb-1";
-                badge.setAttribute('data-area', area);
-                badge.innerText = (i === 0 ? "Pendente: " : "") + area;
-                badgesArea.appendChild(badge);
-            });
-            trSelecionada.classList.remove("concluida", "table-success");
-            trSelecionada.classList.add("table-area-externa");
-        } else {
-            trSelecionada.className = trSelecionada.getAttribute("data-original-class");
-        }
-        bootstrap.Modal.getInstance(document.getElementById('modalSelecionarArea')).hide();
+        var atividadeId = trSelecionada.dataset.id;
+        const areasString = areasTemp.join(','); // Transforma o array de áreas em string separada por vírgula
+
+        fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action_type: 'areas_pendentes', new_value: areasString })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Pendência de área atualizada!', 'success');
+                // Atualiza o frontend
+                var badgesArea = trSelecionada.querySelector('.badges-area');
+                badgesArea.innerHTML = ""; // Limpa os badges existentes na linha da tabela
+                if (areasTemp.length > 0) {
+                    areasTemp.forEach(function(area, i){
+                        var badge = document.createElement("span");
+                        badge.className = "badge bg-area ms-1 mb-1";
+                        badge.setAttribute('data-area', area);
+                        badge.innerText = (i === 0 ? "Pendente: " : "") + area;
+                        badgesArea.appendChild(badge);
+                    });
+                    trSelecionada.classList.remove("concluida", "table-success");
+                    trSelecionada.classList.add("table-area-externa");
+                    // Atualiza o texto de status
+                    const spanStatus = trSelecionada.querySelector('.span-status');
+                    if (spanStatus) spanStatus.textContent = `Pendente: ${areasString.replace(/,/g, ', ')}`;
+                } else {
+                    trSelecionada.classList.remove("concluida", "table-success", "table-area-externa"); // Remover também a classe de área externa
+                    // Re-aplica a cor original baseada nos dias
+                    const dias = trSelecionada.dataset.dias;
+                    const originalColorClass = getOriginalColorClass(dias);
+                    if (originalColorClass) {
+                        trSelecionada.classList.add(originalColorClass);
+                    } else {
+                        trSelecionada.classList.remove('table-danger', 'table-warning', 'table-primary', 'table-secondary');
+                    }
+                    const spanStatus = trSelecionada.querySelector('.span-status');
+                    if (spanStatus) spanStatus.textContent = `Pendente`; // Volta para Pendente se não tem áreas
+                }
+                modalSelecionarArea.hide();
+            } else {
+                showToast(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao atualizar pendência de área:', error);
+            showToast('Erro de comunicação com o servidor.', 'danger');
+        });
     });
+
+    // === LÓGICA PARA O MODAL DE FERIADOS ===
+    const modalFeriados = document.getElementById('modalFeriados');
+    const feriadosRawInput = document.getElementById('feriadosRawInput');
+    const hiddenFeriadosRawInput = document.getElementById('hiddenFeriadosRawInput');
+    const btnSaveFeriadosForm = document.getElementById('btnSaveFeriadosForm');
+    const manualHolidayDate = document.getElementById('manualHolidayDate');
+    const manualHolidayName = document.getElementById('manualHolidayName');
+    const manualHolidayLocation = document.getElementById('manualHolidayLocation');
+    const manualHolidayType = document.getElementById('manualHolidayType');
+    const btnAddManualHoliday = document.getElementById('btnAddManualHoliday');
+    const apiFetchYear = document.getElementById('apiFetchYear');
+    const apiFetchState = document.getElementById('apiFetchState');
+    const apiFetchCity = document.getElementById('apiFetchCity');
+    const btnFetchHolidays = document.getElementById('btnFetchHolidays');
+    const apiHolidaysResult = document.getElementById('apiHolidaysResult');
+
+    // Função para mostrar toast (assumindo que já existe ou é fornecida no base.html)
+    function showToast(message, category = 'info') {
+        const toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) {
+            console.error('Toast container not found');
+            alert(message); // Fallback
+            return;
+        }
+        const toastEl = document.createElement('div');
+        toastEl.classList.add('toast', 'align-items-center', 'text-white', `bg-${category}`, 'border-0');
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        toastEl.setAttribute('data-bs-autohide', 'true');
+        toastEl.setAttribute('data-bs-delay', '5000');
+        toastEl.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi ${category === 'success' ? 'bi-check-circle-fill' : category === 'danger' ? 'bi-exclamation-triangle-fill' : category === 'warning' ? 'bi-exclamation-circle-fill' : 'bi-info-circle-fill'} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        toastContainer.appendChild(toastEl);
+        const toast = new bootstrap.Toast(toastEl);
+        toast.show();
+    }
+
+
+    // Ao abrir o modal, garante que a textarea está atualizada com os feriados do backend
+    modalFeriados.addEventListener('show.bs.modal', function () {
+        // Para garantir que a textarea sempre reflita o estado atual do DB
+        // Fetch para obter os feriados mais recentes e atualizar a textarea
+        fetch('/monitor_juridico/get_holidays_json') // Nova rota para buscar feriados em JSON
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const formattedHolidays = data.holidays.map(h => h.date_formatted).join(', ');
+                    feriadosRawInput.value = formattedHolidays;
+                } else {
+                    console.error('Erro ao buscar feriados para o modal:', data.message);
+                    showToast('Erro ao carregar feriados no modal.', 'danger');
+                }
+            })
+            .catch(error => console.error('Erro de rede ao buscar feriados:', error));
+    });
+
+    // Lógica para o botão "Salvar Todas as Mudanças" (da textarea)
+    btnSaveFeriadosForm.addEventListener('click', function (event) {
+        // Captura o conteúdo da textarea
+        hiddenFeriadosRawInput.value = feriadosRawInput.value;
+        // O formulário escondido será submetido
+        document.getElementById('formFeriadosSubmit').submit();
+    });
+
+
+    // Lógica para Adicionar Feriado Manualmente
+    btnAddManualHoliday.addEventListener('click', function () {
+        const date = manualHolidayDate.value;
+        const name = manualHolidayName.value || 'Feriado Manual';
+        const location = manualHolidayLocation.value || 'Nacional';
+        const type = manualHolidayType.value || 'Manual';
+
+        if (!date) {
+            showToast('Por favor, insira a data do feriado.', 'warning');
+            return;
+        }
+
+        const holidayData = {
+            date: date, // AAAA-MM-DD
+            name: name,
+            location: location,
+            type: type
+        };
+
+        fetch('/manage_holiday_db', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ action: 'add', holiday: holidayData })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                // Após adicionar, recarregar a textarea para mostrar o novo feriado
+                modalFeriados.dispatchEvent(new Event('show.bs.modal')); // Dispara o evento para recarregar
+                manualHolidayDate.value = '';
+                manualHolidayName.value = '';
+                manualHolidayLocation.value = '';
+                manualHolidayType.value = '';
+            } else {
+                showToast(data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao adicionar feriado manualmente:', error);
+            showToast('Erro ao adicionar feriado. Verifique o console.', 'danger');
+        });
+    });
+
+    // Lógica para Buscar Feriados da API
+    btnFetchHolidays.addEventListener('click', function () {
+        const year = apiFetchYear.value;
+        const state = apiFetchState.value;
+        const city = apiFetchCity.value;
+
+        if (!year) {
+            showToast('Por favor, insira o ano para buscar feriados.', 'warning');
+            return;
+        }
+
+        apiHolidaysResult.innerHTML = '<div class="text-center text-primary"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Buscando feriados...</div>';
+
+        // Usamos URLSearchParams para construir a query string
+        const params = new URLSearchParams({ ano: year });
+        if (state) params.append('estado', state);
+        if (city) params.append('municipio', city);
+
+        fetch(`/fetch_holidays_api?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                apiHolidaysResult.innerHTML = ''; // Limpa a mensagem de carregamento
+                if (data.success) {
+                    if (data.holidays && data.holidays.length > 0) {
+                        let html = '<p>Feriados encontrados (clique para adicionar):</p>';
+                        html += '<ul class="list-group">';
+                        data.holidays.forEach(holiday => {
+                            const formattedDate = new Date(holiday.date + 'T00:00:00').toLocaleDateString('pt-BR');
+                            html += `
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    ${formattedDate} - ${holiday.name} (${holiday.location || 'Nacional'})
+                                    <button type="button" class="btn btn-sm btn-outline-success btn-add-api-holiday"
+                                            data-date="${holiday.date}"
+                                            data-name="${holiday.name}"
+                                            data-location="${holiday.location || 'Nacional'}"
+                                            data-type="${holiday.type || 'Nacional'}">
+                                        <i class="bi bi-plus-circle"></i> Adicionar
+                                    </button>
+                                </li>
+                            `;
+                        });
+                        html += '</ul>';
+                        apiHolidaysResult.innerHTML = html;
+
+                        // Adiciona listeners para os botões "Adicionar" dos feriados da API
+                        document.querySelectorAll('.btn-add-api-holiday').forEach(button => {
+                            button.addEventListener('click', function() {
+                                const hData = this.dataset;
+                                const holidayToAdd = {
+                                    date: hData.date,
+                                    name: hData.name,
+                                    location: hData.location,
+                                    type: hData.type
+                                };
+                                fetch('/manage_holiday_db', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ action: 'add', holiday: holidayToAdd })
+                                })
+                                .then(res => res.json())
+                                .then(addResult => {
+                                    if (addResult.success) {
+                                        showToast(addResult.message, 'success');
+                                        // Após adicionar, recarregar a textarea para mostrar o novo feriado
+                                        modalFeriados.dispatchEvent(new Event('show.bs.modal')); // Dispara o evento para recarregar
+                                        this.disabled = true; // Desabilita o botão após adicionar
+                                        this.innerHTML = '<i class="bi bi-check-lg"></i> Adicionado';
+                                        this.classList.replace('btn-outline-success', 'btn-success');
+                                    } else {
+                                        showToast(addResult.message, 'danger');
+                                    }
+                                })
+                                .catch(addError => {
+                                    console.error('Erro ao adicionar feriado da API:', addError);
+                                    showToast('Erro ao adicionar feriado da API.', 'danger');
+                                });
+                            });
+                        });
+                    } else {
+                        apiHolidaysResult.innerHTML = '<div class="alert alert-info">Nenhum feriado encontrado para este ano e filtros.</div>';
+                    }
+                } else {
+                    showToast(data.message || 'Erro ao buscar feriados da API.', 'danger');
+                    apiHolidaysResult.innerHTML = `<div class="alert alert-danger">${data.message || 'Erro ao buscar feriados da API.'}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição da API de feriados:', error);
+                apiHolidaysResult.innerHTML = '<div class="alert alert-danger">Erro na conexão com a API de feriados.</div>';
+                showToast('Erro na conexão com a API de feriados. Verifique sua internet.', 'danger');
+            });
+    });
+
 });
 </script>
 {% endblock %}

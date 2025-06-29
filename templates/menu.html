@@ -39,6 +39,10 @@
         <span class="menu-icon"><i class="bi bi-person-fill-gear"></i></span>
         <span class="menu-title">Gerenciar Usuários</span>
     </a>
+    <a href="{{ url_for('admin_settings') }}" class="menu-card"> {# NOVO LINK #}
+        <span class="menu-icon"><i class="bi bi-gear-wide-connected"></i></span>
+        <span class="menu-title">Configurações Gerais</span>
+    </a>
     {% endif %}
 </div>
 {% endblock %}

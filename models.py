@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 
@@ -30,14 +30,12 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    # MUITO IMPORTANTE: role_id DEVE ser nullable=False e SEM default AQUI.
-    # O valor será atribuído via código no init_db.py ou na rota /register.
-    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False) 
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
     role = db.relationship('Role', backref=db.backref('users', lazy=True))
-    
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
@@ -62,3 +60,55 @@ class Log(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     codigo_controle = db.Column(db.String(50), nullable=True)
     nome_cliente = db.Column(db.String(120), nullable=True)
+
+class Configuracao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    chave = db.Column(db.String(100), unique=True, nullable=False)
+    valor = db.Column(db.String(255), nullable=True)
+    tipo = db.Column(db.String(50), nullable=True)
+    descricao = db.Column(db.Text, nullable=True)
+
+    def __repr__(self):
+        return f'<Configuracao {self.chave}: {self.valor}>'
+
+class Feriado(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data = db.Column(db.Date, nullable=False, unique=False)
+    nome = db.Column(db.String(100), nullable=True)
+    localidade = db.Column(db.String(50), nullable=True)
+    tipo = db.Column(db.String(50), nullable=True)
+
+    def __repr__(self):
+        return f'<Feriado {self.data.strftime("%d/%m/%Y")} ({self.localidade or "Nacional"})>'
+
+    def format_date_br(self):
+        return self.data.strftime('%d/%m/%Y')
+
+class AtividadeJuridica(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(120), nullable=True)
+    assunto = db.Column(db.String(255), nullable=True)
+    data_criacao = db.Column(db.Date, nullable=False)
+    proprietario = db.Column(db.String(120), nullable=True)
+    criado_por = db.Column(db.String(120), nullable=True)
+    prioridade = db.Column(db.String(50), default='Normal')
+    status = db.Column(db.String(50), default='Pendente')
+    data_ultimo_status = db.Column(db.DateTime, default=datetime.utcnow)
+    areas_pendentes = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f'<AtividadeJuridica {self.assunto} - {self.status}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tipo': self.tipo,
+            'assunto': self.assunto,
+            'data_criacao': self.data_criacao.strftime('%d/%m/%Y') if self.data_criacao else None,
+            'proprietario': self.proprietario,
+            'criado_por': self.criado_por,
+            'prioridade': self.prioridade,
+            'status': self.status,
+            'data_ultimo_status': self.data_ultimo_status.strftime('%d/%m/%Y %H:%M') if self.data_ultimo_status else None,
+            'areas_pendentes': self.areas_pendentes
+        }
