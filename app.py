@@ -1307,7 +1307,7 @@ def monitor_juridico():
             'tipo': tipo_atividade, # Usar a variável definida
             'original_status': current_status_db,
             'areas_pendentes': areas_pendentes_db
-        }
+        } ## TEST
 
         if 'liberação de fluxo' in assunto.lower():
             atividades_liberacao.append(atividade_dict)
