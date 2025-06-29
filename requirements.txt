@@ -2,8 +2,8 @@ flask==2.3.2
 flask-sqlalchemy==3.0.3
 flask-wtf==1.2.2
 flask-migrate==4.1.0
-pandas==2.2.0 # Atualize para a mesma versão do pyproject.toml
-numpy==1.26.0 # Atualize para a mesma versão do pyproject.toml
+pandas==2.2.0
+numpy==1.26.0 
 openpyxl==3.1.2
 python-dotenv==1.0.0
 werkzeug==2.3.6

@@ -6,14 +6,10 @@ authors = ["Augusto Nascimento <augusto.nascimentto2@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.13" # Mantenha esta linha como está.
+python = "^3.13"
 
-# ATUALIZE ESTAS DUAS LINHAS:
-pandas = "^2.2.0" # Ou a versão mais recente disponível para Python 3.13.x
-numpy = "^1.26.0" # Ou a versão mais recente disponível para Python 3.13.x
-                  # (A partir de junho de 2025, versões mais recentes devem ser compatíveis.)
-
-# Mantenha o restante das suas dependências conforme já está
+pandas = "^2.2.0" 
+numpy = "^1.26.0"            
 flask = "2.3.2"
 flask-sqlalchemy = "3.0.3"
 flask-wtf = "1.2.2"

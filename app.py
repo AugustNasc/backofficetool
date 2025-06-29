@@ -42,7 +42,7 @@ from utils.dias_uteis import dias_uteis_entre_datas
 from utils.value_correction import corrigir_valor
 from utils.auth import authenticate_user
 
-# ===== FIM DOS IMPORTS ORGANIZADOS =====
+# ===== FIM DOS IMPORTS =====
 
 app = Flask(__name__)
 app.config.from_object(Config)
