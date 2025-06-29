@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "backoffice-tools" 
+version = "0.1.0"
+description = "Backoffice Tools Application"
+authors = ["Augusto Nascimento <augusto.nascimentto2@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12" 
+                       
+                       
+
+# Dependências do seu requirements.txt:
+flask = "2.3.2"
+flask-sqlalchemy = "3.0.3"
+flask-wtf = "1.2.2"
+flask-migrate = "4.1.0"
+pandas = "2.0.3"
+numpy = "1.24.3"
+openpyxl = "3.1.2"
+python-dotenv = "1.0.0"
+werkzeug = "2.3.6"
+fpdf2 = "2.7.4"
+gunicorn = "20.1.0"
+requests = "2.31.0"
+xlsxwriter = "3.0.3"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
