@@ -6,16 +6,18 @@ authors = ["Augusto Nascimento <augusto.nascimentto2@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.13" # Ou python = "3.13.4" para ser exato.
-                  # Usar ^3.13 significa >=3.13.0 e <3.14.0.
+python = "^3.13" # Mantenha esta linha como está.
 
-# Dependências do seu requirements.txt:
+# ATUALIZE ESTAS DUAS LINHAS:
+pandas = "^2.2.0" # Ou a versão mais recente disponível para Python 3.13.x
+numpy = "^1.26.0" # Ou a versão mais recente disponível para Python 3.13.x
+                  # (A partir de junho de 2025, versões mais recentes devem ser compatíveis.)
+
+# Mantenha o restante das suas dependências conforme já está
 flask = "2.3.2"
 flask-sqlalchemy = "3.0.3"
 flask-wtf = "1.2.2"
 flask-migrate = "4.1.0"
-pandas = "2.0.3"
-numpy = "1.24.3"
 openpyxl = "3.1.2"
 python-dotenv = "1.0.0"
 werkzeug = "2.3.6"
