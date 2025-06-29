@@ -6,9 +6,8 @@ authors = ["Augusto Nascimento <augusto.nascimentto2@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.12" 
-                       
-                       
+python = "^3.13" # Ou python = "3.13.4" para ser exato.
+                  # Usar ^3.13 significa >=3.13.0 e <3.14.0.
 
 # Dependências do seu requirements.txt:
 flask = "2.3.2"
