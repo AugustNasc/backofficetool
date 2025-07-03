@@ -1,9 +1,11 @@
 import pandas as pd
-from utils.file_processing import analyze_pleitos, filtrar_clientes_excluidos
+from utils.file_processing import analyze_pleitos # Remover filtrar_clientes_excluidos, pois será interna a analyze_pleitos
 import io # Importar io para o stream de saída
 
-def preparar_base_excel(df, filter_column='', filter_value=''):
-    df = filtrar_clientes_excluidos(df)
+def preparar_base_excel(df, filter_column='', filter_value='', clientes_excluidos_list=None, produtos_excluidos_list=None): # Adicionados argumentos
+    # REMOVIDO: df = filtrar_clientes_excluidos(df) # O filtro agora é feito dentro de analyze_pleitos
+
+    # Aplica o filtro de coluna e valor antes de analyze_pleitos para garantir que a análise seja feita na subseleção
     if filter_column and filter_value:
         if filter_column == 'Valor':
             try:
@@ -19,7 +21,9 @@ def preparar_base_excel(df, filter_column='', filter_value=''):
                 pass
         else:
             df = df[df[filter_column].astype(str).str.contains(filter_value, case=False, na=False)]
-    df = analyze_pleitos(df)
+    
+    # NOVO: Chamar analyze_pleitos passando as listas de exclusão
+    df = analyze_pleitos(df, clientes_excluidos_list=clientes_excluidos_list, produtos_excluidos_list=produtos_excluidos_list)
     return df
 
 def exportar_sla_excel(df, output_stream):

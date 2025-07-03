@@ -25,7 +25,36 @@
                     Pleitos com Data de Pendência **anterior ou igual** a esta data serão contados como atrasados.
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">
+
+            {# NOVO: Configuração para Clientes Excluídos #}
+            <h4 class="mb-3 mt-4">Clientes Excluídos da Análise</h4>
+            <div class="mb-3">
+                <label for="clientes_excluidos_input" class="form-label">
+                    Clientes a Excluir (separados por vírgula):
+                </label>
+                <textarea class="form-control" id="clientes_excluidos_input"
+                          name="clientes_excluidos_input" rows="3"
+                          placeholder="Ex: CLIENTE A, CLIENTE B, CLIENTE C">{{ clientes_excluidos_str }}</textarea>
+                <div class="form-text">
+                    Nomes completos dos clientes que devem ser ignorados na análise de pleitos. Separe por vírgula.
+                </div>
+            </div>
+
+            {# NOVO: Configuração para Produtos Excluídos #}
+            <h4 class="mb-3 mt-4">Produtos Excluídos da Análise</h4>
+            <div class="mb-3">
+                <label for="produtos_excluidos_input" class="form-label">
+                    Produtos a Excluir (separados por vírgula):
+                </label>
+                <textarea class="form-control" id="produtos_excluidos_input"
+                          name="produtos_excluidos_input" rows="3"
+                          placeholder="Ex: TAXA DE SERVICO, PRODUTO OBSOLETO">{{ produtos_excluidos_str }}</textarea>
+                <div class="form-text">
+                    Partes do nome do produto (ex: "taxa") que devem ser ignoradas na análise de pleitos. Separe por vírgula.
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary mt-3">
                 <i class="bi bi-save"></i> Salvar Configurações
             </button>
         </form>

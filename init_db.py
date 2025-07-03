@@ -1,6 +1,7 @@
 from app import app, db
 from models import User, Role, Configuracao, Feriado, AtividadeJuridica
 from datetime import datetime, timedelta, date
+import json # ADICIONAR OU GARANTIR QUE ESTÁ PRESENTE
 
 with app.app_context():
     print("\n--- Iniciando init_db.py ---")
@@ -107,6 +108,38 @@ with app.app_context():
         print(f"  Configuração 'data_limite_pleitos_atrasados' adicionada com valor padrão: {data_padrao_atraso}.")
     else:
         print(f"  Configuração 'data_limite_pleitos_atrasados' já existe (valor atual: {config_atraso.valor}).")
+
+    # NOVO: Configuração para Clientes Excluídos
+    config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
+    if not config_clientes_excluidos:
+        # Transfira os clientes excluídos que estavam hardcoded em file_processing.py
+        clientes_excluidos_padrao = ["J3 TECNOLOGIA E SISTEMAS LTDA"]
+        config_clientes_excluidos = Configuracao(
+            chave='clientes_excluidos',
+            valor=json.dumps(clientes_excluidos_padrao), # Armazenar como JSON string
+            tipo='list',
+            descricao='Lista de clientes a serem excluídos globalmente da análise de pleitos.'
+        )
+        db.session.add(config_clientes_excluidos)
+        print(f"  Configuração 'clientes_excluidos' adicionada com valor padrão: {clientes_excluidos_padrao}.")
+    else:
+        print(f"  Configuração 'clientes_excluidos' já existe (valor atual: {config_clientes_excluidos.valor}).")
+
+    # NOVO: Configuração para Produtos Excluídos
+    config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
+    if not config_produtos_excluidos:
+        # Exemplo: Produtos que continham "taxa" no nome. Ajuste esta lista se necessário.
+        produtos_excluidos_padrao = ["taxa"] 
+        config_produtos_excluidos = Configuracao(
+            chave='produtos_excluidos',
+            valor=json.dumps(produtos_excluidos_padrao), # Armazenar como JSON string
+            tipo='list',
+            descricao='Lista de produtos (ou partes de produtos) a serem excluídos globalmente da análise de pleitos.'
+        )
+        db.session.add(config_produtos_excluidos)
+        print(f"  Configuração 'produtos_excluidos' adicionada com valor padrão: {produtos_excluidos_padrao}.")
+    else:
+        print(f"  Configuração 'produtos_excluidos' já existe (valor atual: {config_produtos_excluidos.valor}).")
 
     if Feriado.query.count() == 0:
         print("\n5. Inserindo feriados padrão no banco de dados...")

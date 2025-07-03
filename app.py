@@ -7,6 +7,7 @@ import logging
 import pandas as pd
 import requests
 import statistics
+import json 
 
 from datetime import datetime, timedelta, date
 from uuid import uuid4
@@ -376,46 +377,92 @@ def admin_settings():
     config_atraso = Configuracao.query.filter_by(chave='data_limite_pleitos_atrasados').first()
     data_limite_atraso = config_atraso.valor if config_atraso else (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d') # Valor padrão se não existir
 
-    if request.method == 'POST':
-        nova_data_str = request.form.get('data_limite_pleitos_atrasados')
+    # NOVO: Recuperar clientes excluídos
+    config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
+    # Se existir, decodifica de JSON; senão, lista vazia
+    clientes_excluidos = json.loads(config_clientes_excluidos.valor) if config_clientes_excluidos and config_clientes_excluidos.valor else []
+    # Para exibir na textarea, converte a lista para uma string separada por vírgulas
+    clientes_excluidos_str = ", ".join(clientes_excluidos)
 
+    # NOVO: Recuperar produtos excluídos
+    config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
+    # Se existir, decodifica de JSON; senão, lista vazia
+    produtos_excluidos = json.loads(config_produtos_excluidos.valor) if config_produtos_excluidos and config_produtos_excluidos.valor else []
+    # Para exibir na textarea, converte a lista para uma string separada por vírgulas
+    produtos_excluidos_str = ", ".join(produtos_excluidos)
+
+
+    if request.method == 'POST':
+        # Lógica para data_limite_pleitos_atrasados (já existente)
+        nova_data_str = request.form.get('data_limite_pleitos_atrasados')
         try:
-            # Tentar converter a data para garantir que é um formato válido antes de salvar
             datetime.strptime(nova_data_str, '%Y-%m-%d')
+            config_atraso = Configuracao.query.filter_by(chave='data_limite_pleitos_atrasados').first()
             if config_atraso:
                 config_atraso.valor = nova_data_str
             else:
-                # Criar se não existir, embora init_db.py já garanta isso
-                config_atraso = Configuracao(
-                    chave='data_limite_pleitos_atrasados',
-                    valor=nova_data_str,
-                    tipo='date',
-                    descricao='Pleitos com Data Pendência anterior ou igual a esta data serão considerados atrasados.'
-                )
+                config_atraso = Configuracao(chave='data_limite_pleitos_atrasados', valor=nova_data_str, tipo='date', descricao='Pleitos com Data Pendência anterior ou igual a esta data serão considerados atrasados.')
                 db.session.add(config_atraso)
-            db.session.commit()
-            flash(f'Data limite para pleitos atrasados atualizada para {nova_data_str}!', 'success')
+            
+            # NOVO: Lógica para clientes excluídos
+            clientes_excluidos_input = request.form.get('clientes_excluidos_input', '').strip()
+            # Converte a string de entrada para uma lista, removendo espaços e entradas vazias
+            clientes_list = [c.strip() for c in clientes_excluidos_input.split(',') if c.strip()]
+            clientes_list_json = json.dumps(clientes_list) # Armazenar como JSON string
 
+            config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
+            if config_clientes_excluidos:
+                config_clientes_excluidos.valor = clientes_list_json
+            else:
+                config_clientes_excluidos = Configuracao(chave='clientes_excluidos', valor=clientes_list_json, tipo='list', descricao='Lista de clientes a serem excluídos globalmente da análise de pleitos.')
+                db.session.add(config_clientes_excluidos)
+            
+            # NOVO: Lógica para produtos excluídos
+            produtos_excluidos_input = request.form.get('produtos_excluidos_input', '').strip()
+            # Converte a string de entrada para uma lista, removendo espaços e entradas vazias
+            produtos_list = [p.strip() for p in produtos_excluidos_input.split(',') if p.strip()]
+            produtos_list_json = json.dumps(produtos_list) # Armazenar como JSON string
+
+            config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
+            if config_produtos_excluidos:
+                config_produtos_excluidos.valor = produtos_list_json
+            else:
+                config_produtos_excluidos = Configuracao(chave='produtos_excluidos', valor=produtos_list_json, tipo='list', descricao='Lista de produtos (ou partes de produtos) a serem excluídos globalmente da análise de pleitos.')
+                db.session.add(config_produtos_excluidos)
+
+            # Commit de todas as mudanças
+            db.session.commit()
+
+            # Log de todas as alterações
             user = User.query.filter_by(username=session['username']).first()
             user_id = user.id if user else None
             new_log = Log(
-                action="UPDATE_CONFIG_ATRASOS",
-                details=f"Data limite de pleitos atrasados alterada para: {nova_data_str}.",
+                action="UPDATE_ADMIN_SETTINGS",
+                details=f"Configurações gerais atualizadas: Data Limite Atrasos='{nova_data_str}', Clientes Excluídos='{clientes_excluidos_input}', Produtos Excluídos='{produtos_excluidos_input}'.",
                 user_id=user_id,
                 timestamp=datetime.utcnow()
             )
             db.session.add(new_log)
             db.session.commit()
 
+            flash(f'Configurações atualizadas com sucesso!', 'success')
             return redirect(url_for('admin_settings'))
+
         except ValueError:
             flash('Formato de data inválido. Por favor, use AAAA-MM-DD.', 'danger')
+            db.session.rollback() # Rollback em caso de erro na data
         except Exception as e:
             db.session.rollback()
-            flash(f'Erro ao salvar configuração: {str(e)}', 'danger')
-            logger.error(f"Erro ao salvar configuração de atrasos: {str(e)}")
+            flash(f'Erro ao salvar configurações: {str(e)}', 'danger')
+            logger.error(f"Erro ao salvar configurações gerais: {str(e)}")
 
-    return render_template('admin_settings.html', data_limite_atraso=data_limite_atraso)
+    # No final da função GET, passe os novos valores para o template:
+    return render_template(
+        'admin_settings.html',
+        data_limite_atraso=data_limite_atraso,
+        clientes_excluidos_str=clientes_excluidos_str, # NOVO
+        produtos_excluidos_str=produtos_excluidos_str  # NOVO
+    )
 
 
 @app.route('/menu')
@@ -492,7 +539,15 @@ def principal():
         try:
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
             df = pd.read_excel(filepath)
-            df = filtrar_clientes_excluidos(df)
+
+            # NOVO: Recuperar clientes e produtos excluídos do DB
+            config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
+            clientes_excluidos_do_db = json.loads(config_clientes_excluidos.valor) if config_clientes_excluidos and config_clientes_excluidos.valor else []
+
+            config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
+            produtos_excluidos_do_db = json.loads(config_produtos_excluidos.valor) if config_produtos_excluidos and config_produtos_excluidos.valor else []
+
+            # REMOVIDO: df = filtrar_clientes_excluidos(df) # O filtro agora é feito dentro de analyze_pleitos
 
             df['Cliente'] = df['Cliente'].astype(str).str.strip()
             df['Consultor'] = df['Consultor'].astype(str).str.strip()
@@ -522,7 +577,16 @@ def principal():
 
             filter_column = session.get('filter_column', 'Consultor')
             filter_value = session.get('filter_value', '')
-            if filter_value:
+
+            # NOVO: Chamar analyze_pleitos passando as listas de exclusão
+            # Este analyze_pleitos é a primeira e principal aplicação de filtros.
+            df = analyze_pleitos(df, consultor_filter="", clientes_excluidos_list=clientes_excluidos_do_db, produtos_excluidos_list=produtos_excluidos_do_db)
+
+            # O filtro de coluna e valor abaixo deve ser aplicado *APÓS* analyze_pleitos,
+            # pois analyze_pleitos já faz a filtragem principal e de hotlines.
+            # Seu código já aplica o filtro de coluna e valor depois de analyze_pleitos,
+            # então ele deve continuar a fazer isso, mas agora em um DataFrame já pré-filtrado.
+            if filter_value: 
                 if filter_column == 'Valor':
                     try:
                         filter_num = float(filter_value)
@@ -538,7 +602,6 @@ def principal():
                 else:
                     df = df[df[filter_column].astype(str).str.contains(filter_value, case=False, na=False)]
 
-            df = analyze_pleitos(df)
             display_data = [{
                 'Consultor': row.get('Consultor', ''),
                 'Cliente': row.get('Cliente', ''),
@@ -685,9 +748,20 @@ def exportar():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
         df = pd.read_excel(filepath)
 
+        # NOVO: Recuperar clientes e produtos excluídos do DB para exportação
+        config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
+        clientes_excluidos_do_db = json.loads(config_clientes_excluidos.valor) if config_clientes_excluidos and config_clientes_excluidos.valor else []
+
+        config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
+        produtos_excluidos_do_db = json.loads(config_produtos_excluidos.valor) if config_produtos_excluidos and config_produtos_excluidos.valor else []
+
         filter_column = session.get('filter_column', '')
         filter_value = session.get('filter_value', '')
-        df = preparar_base_excel(df, filter_column, filter_value)
+
+        # NOVO: Chamar preparar_base_excel passando as listas de exclusão
+        df = preparar_base_excel(df, filter_column, filter_value,
+                                 clientes_excluidos_list=clientes_excluidos_do_db,
+                                 produtos_excluidos_list=produtos_excluidos_do_db)
 
         export_filename = f"pleitos_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
@@ -944,9 +1018,9 @@ def calcular_multa():
             prazo_total_dias = (data_fim_contrato - data_ativacao).days + 1
             data_inicio_aviso = data_recebimento
             data_termino_aviso = data_recebimento + timedelta(days=aviso_previo)
-            data_inicio_multa = data_termino_aviso + timedelta(days=1)
-            data_cancelamento = data_inicio_multa
-            prazo_cumprido = (data_inicio_multa - data_ativacao).days
+            data_inicio_multa = data_termino_aviso # Altera para ser igual à data_termino_aviso
+            data_cancelamento = data_termino_aviso # Altera para ser igual à data_termino_aviso
+            prazo_cumprido = (data_cancelamento - data_ativacao).days # Importante: usar data_cancelamento aqui
             prazo_faltante = prazo_total_dias - prazo_cumprido
             valor_diario = valor_servicos / 30 if valor_servicos else 0 # Usando 30 dias para valor diário
 
@@ -1189,12 +1263,11 @@ def monitor_juridico():
                     assunto_str = str(row.get('Assunto', '')).strip().lower()
 
                     is_squad_contratacao = tipo_str == 'squad contratação'
-                    is_outros_condicionado = (tipo_str == 'outros' and
-                                              ('análise de contrato' in assunto_str or 'solicitação de documento' in assunto_str))
+                    is_outros = tipo_str == 'outros' # Nova variável para incluir apenas "Outros"
                     is_liberacao_fluxo = 'liberação de fluxo' in assunto_str
 
 
-                    if is_squad_contratacao or is_outros_condicionado or is_liberacao_fluxo:
+                    if is_squad_contratacao or is_outros or is_liberacao_fluxo:
                         # O status será padrão 'Pendente' se não existir na planilha ou for vazia
                         # Se a coluna 'Status' existe, usa o valor dela, caso contrário, 'Pendente'
                         status_from_excel = row.get('Status', 'Pendente') if 'Status' in df.columns else 'Pendente'
