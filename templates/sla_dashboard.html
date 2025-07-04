@@ -29,7 +29,6 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Formulário de entrada (pode manter o seu como já está) -->
         <form method="post" class="row g-3 align-items-end mb-4" enctype="multipart/form-data">
             <div class="col-md-2">
                 <label for="mes" class="form-label">Mês</label>
@@ -64,7 +63,7 @@
                 <input type="text" class="form-control" id="realizado" name="realizado" readonly>
             </div>
             <div class="col-md-2 d-grid gap-2">
-                <button type="submit" class="btn btn-primary">Adicionar Mês</button>
+                <button type="submit" name="acao" value="adicionar_mes" class="btn btn-primary">Adicionar Mês</button>
             </div>
         </form>
 
@@ -82,34 +81,11 @@
             <form method="post" class="d-inline">
                 <button type="submit" name="acao" value="exportar_pdf" class="btn btn-outline-danger btn-sm">Exportar PDF</button>
             </form>
-            <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#modalMeta">
-                Definir Meta Mensal
-            </button>
             {% if resultados|length == 12 %}
             <form method="post" class="d-inline">
                 <button type="submit" name="acao" value="fechar_ano" class="btn btn-dark btn-sm">Fechar Ano</button>
             </form>
             {% endif %}
-        </div>
-
-        <div class="modal fade" id="modalMeta" tabindex="-1" aria-labelledby="modalMetaLabel" aria-hidden="true">
-            <div class="modal-dialog">
-                <form method="post" class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="modalMetaLabel">Definir Meta Mensal</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="acao" value="definir_meta">
-                        <label for="meta_mensal" class="form-label">Meta (%)</label>
-                        <input type="number" min="70" max="100" class="form-control" id="meta_mensal" name="meta_mensal" value="{{ meta }}" required>
-                        <div class="form-text">A meta padrão é 90%. Aceita valores entre 70% e 100%.</div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="submit" class="btn btn-info">Definir Meta</button>
-                    </div>
-                </form>
-            </div>
         </div>
 
         <div class="table-responsive mb-4">
@@ -132,7 +108,7 @@
                         <td>{{ r['qtd_fora_sla'] }}</td>
                         <td>{{ r['qtd_processos'] }}</td>
                         <td>{{ r['realizado']|round(2) }}%</td>
-                        <td>{{ r['meta'] }}</td>
+                        <td>{{ r['meta']|round(0) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -162,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const fora = document.getElementById('qtd_fora_sla');
     const realizado = document.getElementById('realizado');
     const processos = document.getElementById('qtd_processos');
+
     function atualizarRealizado() {
         const d = parseInt(dentro.value) || 0;
         const f = parseInt(fora.value) || 0;
@@ -173,13 +150,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         processos.value = total;
     }
+
     dentro.addEventListener('input', atualizarRealizado);
     fora.addEventListener('input', atualizarRealizado);
 
     // Chart.js gráfico barra + linha meta
-    const meses = {{ resultados|map(attribute='mes_nome')|list|tojson }};
-    const valores = {{ resultados|map(attribute='realizado')|list|tojson }};
-    const meta = JSON.parse('{{ meta|tojson|safe }}');
+    // Certifique-se que 'resultados' está sendo passado corretamente do Flask para o template
+    const resultadosData = {{ resultados|tojson|safe }}; // Pega os dados diretamente
+    const meses = resultadosData.map(r => r.mes_nome);
+    const valores = resultadosData.map(r => r.realizado);
+    
+    const meta = parseFloat("{{ meta }}"); 
     const ctx = document.getElementById('slaBarChart').getContext('2d');
     if (ctx && meses.length > 0) {
         new Chart(ctx, {

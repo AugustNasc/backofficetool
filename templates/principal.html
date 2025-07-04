@@ -12,7 +12,6 @@
     </button>
 </div>
 
-<!-- MODAL CONTAS EM TRANSIÇÃO -->
 <div class="modal fade" id="contasTransicaoModal" tabindex="-1" aria-labelledby="contasTransicaoLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <form class="modal-content" method="POST" action="{{ url_for('contas_transicao') }}" enctype="multipart/form-data">
@@ -57,7 +56,6 @@
   </div>
 </div>
 
-<!-- RESUMO POR CONSULTOR (cards + modal) -->
 <div class="card mb-4">
     <div class="card-header bg-secondary text-white">
         <h5 class="mb-0">Resumo por Consultor</h5>
@@ -86,7 +84,6 @@
     </div>
 </div>
 
-<!-- Tabelas de pleitos por consultor (ocultas) -->
 {% for box in resumo %}
 <div class="pleitos-tabela" id="tabela-{{ loop.index0 }}" style="display: none;">
     <table class="table table-sm table-bordered align-middle mb-0">
@@ -112,7 +109,6 @@
 </div>
 {% endfor %}
 
-<!-- Modal Bootstrap para detalhar pleitos do consultor (apenas Cód. de Controle, Valor, Serviço, Data) -->
 <div class="modal fade" id="pleitosModal" tabindex="-1" aria-labelledby="pleitosModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -121,13 +117,11 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
       </div>
       <div class="modal-body" id="modalPleitosBody">
-        <!-- Conteúdo gerado via JS -->
-      </div>
+        </div>
     </div>
   </div>
 </div>
 
-<!-- Modal de Confirmação para Substituição de Planilha -->
 <div class="modal fade" id="modalConfirmarSubstituir" tabindex="-1" aria-labelledby="modalConfirmarSubstituirLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -148,7 +142,6 @@
   </div>
 </div>
 
-<!-- Filtros de busca -->
 <form method="POST" action="{{ url_for('analisar') }}" class="mb-3" enctype="multipart/form-data">
     <div class="row align-items-end">
         <div class="col-md-3 mb-2">
@@ -174,7 +167,6 @@
     </div>
 </form>
 
-<!-- Upload de planilha -->
 <form method="POST" action="{{ url_for('principal') }}" enctype="multipart/form-data" class="mb-3" id="formUploadPlanilha">
     <div class="row align-items-end">
         <div class="col-md-8 mb-2">
@@ -189,9 +181,11 @@
 </form>
 
 {% if data %}
+{# NOVO: Mensagem de status da base #}
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i>
-    Exibindo {{ data_length }} registro(s). Mostrando até 20 na tabela abaixo.
+    Exibindo {{ data_length }} registro(s). Base carregada em: **{{ ultima_carga_dt.strftime('%d/%m/%Y %H:%M') }}**.
+    Estimativa para próxima atualização: **{{ proxima_atualizacao_dt.strftime('%d/%m/%Y %H:%M') }}**.
 </div>
 <table class="table table-hover table-bordered">
     <thead class="table-secondary">

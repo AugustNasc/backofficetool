@@ -1,8 +1,11 @@
 import pandas as pd
-from utils.file_processing import analyze_pleitos # Remover filtrar_clientes_excluidos, pois será interna a analyze_pleitos
-import io # Importar io para o stream de saída
+import io 
+import xlsxwriter 
 
-def preparar_base_excel(df, filter_column='', filter_value='', clientes_excluidos_list=None, produtos_excluidos_list=None): # Adicionados argumentos
+from utils.file_processing import analyze_pleitos
+
+
+def preparar_base_excel(df, filter_column='', filter_value='', clientes_excluidos_list=None, produtos_excluidos_list=None):
     # REMOVIDO: df = filtrar_clientes_excluidos(df) # O filtro agora é feito dentro de analyze_pleitos
 
     # Aplica o filtro de coluna e valor antes de analyze_pleitos para garantir que a análise seja feita na subseleção
@@ -26,18 +29,49 @@ def preparar_base_excel(df, filter_column='', filter_value='', clientes_excluido
     df = analyze_pleitos(df, clientes_excluidos_list=clientes_excluidos_list, produtos_excluidos_list=produtos_excluidos_list)
     return df
 
-def exportar_sla_excel(df, output_stream):
+def exportar_sla_excel(df_input, output_stream):
     """
-    df: DataFrame ou lista de dicionários com as colunas:
+    df_input: DataFrame ou lista de dicionários com as colunas:
         ['mes_nome', 'qtd_dentro_sla', 'qtd_fora_sla', 'qtd_processos', 'realizado', 'meta']
     output_stream: io.BytesIO para salvar o Excel temporariamente.
     """
-    if not isinstance(df, pd.DataFrame):
-        df = pd.DataFrame(df)
-    df = df[['mes_nome', 'qtd_dentro_sla', 'qtd_fora_sla', 'qtd_processos', 'realizado', 'meta']]
-    df.columns = ['Mês', 'Qtd. Dentro SLA', 'Qtd. Fora SLA', 'Qtd. Processos', 'Realizado (%)', 'Meta (%)']
+    df = pd.DataFrame(df_input)
+    
+    # --- Início da correção para KeyError 'realizado' ---
+    # Verifica se as colunas 'realizado' e 'meta' existem.
+    # Se não existirem com esses nomes, tenta identificar se foram renomeadas
+    # para 'Realizado (%)' e 'Meta (%)' (nomes finais do Excel)
+    
+    # Primeiro, verificar se as colunas com os nomes finais já estão presentes
+    if 'Realizado (%)' in df.columns and 'realizado' not in df.columns:
+        df.rename(columns={'Realizado (%)': 'realizado'}, inplace=True)
+    
+    if 'Meta (%)' in df.columns and 'meta' not in df.columns:
+        df.rename(columns={'Meta (%)': 'meta'}, inplace=True)
+
+    # Agora, se 'realizado' ou 'meta' ainda não existirem, o problema está na origem dos dados.
+    if 'realizado' not in df.columns:
+        # Você pode adicionar um log aqui se desejar, como logger.error(...)
+        raise KeyError(f"Coluna 'realizado' não encontrada no DataFrame. Colunas disponíveis: {df.columns.tolist()}. Verifique a preparação dos dados em app.py.")
+    
+    if 'meta' not in df.columns:
+        # Você pode adicionar um log aqui se desejar
+        raise KeyError(f"Coluna 'meta' não encontrada no DataFrame. Colunas disponíveis: {df.columns.tolist()}. Verifique a preparação dos dados em app.py.")
+    # --- Fim da correção para KeyError 'realizado' ---
+
+
+    # Aplica arredondamento e conversão de tipo nas colunas relevantes
+    df_export = df.copy() # Trabalha em uma cópia para evitar SettingWithCopyWarning
+
+    df_export['realizado'] = df_export['realizado'].round(2)
+    df_export['meta'] = df_export['meta'].round(0).astype(int)
+
+    # Seleciona e reordena as colunas, depois as renomeia para a saída final do Excel
+    df_export = df_export[['mes_nome', 'qtd_dentro_sla', 'qtd_fora_sla', 'qtd_processos', 'realizado', 'meta']]
+    df_export.columns = ['Mês', 'Qtd. Dentro SLA', 'Qtd. Fora SLA', 'Qtd. Processos', 'Realizado (%)', 'Meta (%)']
+    
     with pd.ExcelWriter(output_stream, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name='SLA', index=False)
+        df_export.to_excel(writer, sheet_name='SLA', index=False)
         worksheet = writer.sheets['SLA']
         worksheet.set_column('A:A', 14)
         worksheet.set_column('B:F', 18)

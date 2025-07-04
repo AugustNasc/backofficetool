@@ -1,7 +1,7 @@
 from app import app, db
 from models import User, Role, Configuracao, Feriado, AtividadeJuridica
 from datetime import datetime, timedelta, date
-import json # ADICIONAR OU GARANTIR QUE ESTÁ PRESENTE
+import json
 
 with app.app_context():
     print("\n--- Iniciando init_db.py ---")
@@ -141,6 +141,34 @@ with app.app_context():
     else:
         print(f"  Configuração 'produtos_excluidos' já existe (valor atual: {config_produtos_excluidos.valor}).")
 
+    # NOVO: Configuração para Intervalo de Atualização da Base (em horas)
+    config_intervalo_atualizacao = Configuracao.query.filter_by(chave='intervalo_atualizacao_base_horas').first()
+    if not config_intervalo_atualizacao:
+        config_intervalo_atualizacao = Configuracao(
+            chave='intervalo_atualizacao_base_horas',
+            valor="24", # Padrão de 24 horas
+            tipo='integer',
+            descricao='Intervalo em horas para a próxima atualização da base de pleitos.'
+        )
+        db.session.add(config_intervalo_atualizacao)
+        print(f"  Configuração 'intervalo_atualizacao_base_horas' adicionada com valor padrão: 24 horas.")
+    else:
+        print(f"  Configuração 'intervalo_atualizacao_base_horas' já existe (valor atual: {config_intervalo_atualizacao.valor}).")
+
+    # NOVO: Configuração para Logo na Impressão
+    config_logo_impressao = Configuracao.query.filter_by(chave='logo_impressao_url').first()
+    if not config_logo_impressao:
+        config_logo_impressao = Configuracao(
+            chave='logo_impressao_url',
+            valor="", # Caminho vazio por padrão
+            tipo='string',
+            descricao='URL ou caminho da imagem da logo para cabeçalhos de impressão.'
+        )
+        db.session.add(config_logo_impressao)
+        print(f"  Configuração 'logo_impressao_url' adicionada (vazia por padrão).")
+    else:
+        print(f"  Configuração 'logo_impressao_url' já existe (valor atual: {config_logo_impressao.valor}).")
+
     if Feriado.query.count() == 0:
         print("\n5. Inserindo feriados padrão no banco de dados...")
         feriados_padrao_nacional = [
@@ -204,6 +232,20 @@ with app.app_context():
             print(f"  ERRO ao inserir atividades jurídicas de exemplo: {e}")
     else:
         print("\n6. Atividades jurídicas já existem no banco de dados. Pulando inserção de exemplos.")
+
+# NOVO: Configuração para Meta de SLA Mensal
+    config_sla_meta = Configuracao.query.filter_by(chave='sla_meta_percentual').first()
+    if not config_sla_meta:
+        config_sla_meta = Configuracao(
+            chave='sla_meta_percentual',
+            valor="90", # Padrão de 90%
+            tipo='integer',
+            descricao='Meta percentual para o dashboard de SLA mensal.'
+        )
+        db.session.add(config_sla_meta)
+        print(f"  Configuração 'sla_meta_percentual' adicionada com valor padrão: 90%.")
+    else:
+        print(f"  Configuração 'sla_meta_percentual' já existe (valor atual: {config_sla_meta.valor}).")
 
     try:
         db.session.commit()

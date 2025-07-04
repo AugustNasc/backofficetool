@@ -14,6 +14,9 @@ from uuid import uuid4
 from io import BytesIO
 from functools import wraps
 
+from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal
+
+
 from flask import (
     Flask, render_template, request, redirect, url_for, session, flash,
     send_from_directory, abort, make_response, send_file, current_app, jsonify
@@ -42,6 +45,9 @@ from utils.file_processing import (
 from utils.dias_uteis import dias_uteis_entre_datas
 from utils.value_correction import corrigir_valor
 from utils.auth import authenticate_user
+
+
+from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento # Adicionar Cancelamento aqui
 
 # ===== FIM DOS IMPORTS =====
 
@@ -377,23 +383,27 @@ def admin_settings():
     config_atraso = Configuracao.query.filter_by(chave='data_limite_pleitos_atrasados').first()
     data_limite_atraso = config_atraso.valor if config_atraso else (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d') # Valor padrão se não existir
 
-    # NOVO: Recuperar clientes excluídos
     config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
-    # Se existir, decodifica de JSON; senão, lista vazia
     clientes_excluidos = json.loads(config_clientes_excluidos.valor) if config_clientes_excluidos and config_clientes_excluidos.valor else []
-    # Para exibir na textarea, converte a lista para uma string separada por vírgulas
     clientes_excluidos_str = ", ".join(clientes_excluidos)
 
-    # NOVO: Recuperar produtos excluídos
     config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
-    # Se existir, decodifica de JSON; senão, lista vazia
     produtos_excluidos = json.loads(config_produtos_excluidos.valor) if config_produtos_excluidos and config_produtos_excluidos.valor else []
-    # Para exibir na textarea, converte a lista para uma string separada por vírgulas
     produtos_excluidos_str = ", ".join(produtos_excluidos)
 
+    # Recuperar Intervalo de Atualização
+    config_intervalo_atualizacao = Configuracao.query.filter_by(chave='intervalo_atualizacao_base_horas').first()
+    intervalo_atualizacao_horas = config_intervalo_atualizacao.valor if config_intervalo_atualizacao else "24" # Padrão
+    
+    # Recuperar URL da Logo de Impressão
+    config_logo_impressao = Configuracao.query.filter_by(chave='logo_impressao_url').first()
+    logo_impressao_url = config_logo_impressao.valor if config_logo_impressao else ""
+
+    # NOVO: Recuperar Meta de SLA
+    config_sla_meta = Configuracao.query.filter_by(chave='sla_meta_percentual').first()
+    sla_meta_percentual = config_sla_meta.valor if config_sla_meta else "90" # Padrão
 
     if request.method == 'POST':
-        # Lógica para data_limite_pleitos_atrasados (já existente)
         nova_data_str = request.form.get('data_limite_pleitos_atrasados')
         try:
             datetime.strptime(nova_data_str, '%Y-%m-%d')
@@ -404,11 +414,9 @@ def admin_settings():
                 config_atraso = Configuracao(chave='data_limite_pleitos_atrasados', valor=nova_data_str, tipo='date', descricao='Pleitos com Data Pendência anterior ou igual a esta data serão considerados atrasados.')
                 db.session.add(config_atraso)
             
-            # NOVO: Lógica para clientes excluídos
             clientes_excluidos_input = request.form.get('clientes_excluidos_input', '').strip()
-            # Converte a string de entrada para uma lista, removendo espaços e entradas vazias
             clientes_list = [c.strip() for c in clientes_excluidos_input.split(',') if c.strip()]
-            clientes_list_json = json.dumps(clientes_list) # Armazenar como JSON string
+            clientes_list_json = json.dumps(clientes_list)
 
             config_clientes_excluidos = Configuracao.query.filter_by(chave='clientes_excluidos').first()
             if config_clientes_excluidos:
@@ -417,11 +425,9 @@ def admin_settings():
                 config_clientes_excluidos = Configuracao(chave='clientes_excluidos', valor=clientes_list_json, tipo='list', descricao='Lista de clientes a serem excluídos globalmente da análise de pleitos.')
                 db.session.add(config_clientes_excluidos)
             
-            # NOVO: Lógica para produtos excluídos
             produtos_excluidos_input = request.form.get('produtos_excluidos_input', '').strip()
-            # Converte a string de entrada para uma lista, removendo espaços e entradas vazias
             produtos_list = [p.strip() for p in produtos_excluidos_input.split(',') if p.strip()]
-            produtos_list_json = json.dumps(produtos_list) # Armazenar como JSON string
+            produtos_list_json = json.dumps(produtos_list)
 
             config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
             if config_produtos_excluidos:
@@ -430,15 +436,91 @@ def admin_settings():
                 config_produtos_excluidos = Configuracao(chave='produtos_excluidos', valor=produtos_list_json, tipo='list', descricao='Lista de produtos (ou partes de produtos) a serem excluídos globalmente da análise de pleitos.')
                 db.session.add(config_produtos_excluidos)
 
-            # Commit de todas as mudanças
-            db.session.commit()
+            # Lógica para Intervalo de Atualização da Base
+            intervalo_atualizacao_input = request.form.get('intervalo_atualizacao_base_horas', '').strip()
+            try:
+                intervalo_atualizacao_int = int(intervalo_atualizacao_input)
+                if not (1 <= intervalo_atualizacao_int <= 720): # Limite entre 1 hora e 30 dias (720 horas)
+                    flash('Intervalo de atualização deve ser entre 1 e 720 horas.', 'danger')
+                    db.session.rollback()
+                    return redirect(url_for('admin_settings'))
+            except ValueError:
+                flash('Intervalo de atualização inválido. Use um número inteiro.', 'danger')
+                db.session.rollback()
+                return redirect(url_for('admin_settings'))
 
-            # Log de todas as alterações
+            config_intervalo_atualizacao = Configuracao.query.filter_by(chave='intervalo_atualizacao_base_horas').first()
+            if config_intervalo_atualizacao:
+                config_intervalo_atualizacao.valor = str(intervalo_atualizacao_int)
+            else:
+                config_intervalo_atualizacao = Configuracao(chave='intervalo_atualizacao_base_horas', valor=str(intervalo_atualizacao_int), tipo='integer', descricao='Intervalo em horas para a próxima atualização da base de pleitos.')
+                db.session.add(config_intervalo_atualizacao)
+
+            # Lógica para Upload e URL da Logo de Impressão
+            logo_file = request.files.get('logo_impressao_file')
+            logo_url_input = request.form.get('logo_impressao_url_manual', '').strip()
+            
+            logo_path_to_save = ""
+
+            if logo_file and logo_file.filename:
+                allowed_image_extensions = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+                if '.' in logo_file.filename and logo_file.filename.rsplit('.', 1)[1].lower() in allowed_image_extensions:
+                    os.makedirs(app.config['UPLOAD_LOGO_FOLDER'], exist_ok=True)
+                    filename = secure_filename(f"logo_{uuid.uuid4().hex}_{logo_file.filename}")
+                    filepath = os.path.join(app.config['UPLOAD_LOGO_FOLDER'], filename)
+                    logo_file.save(filepath)
+                    logo_path_to_save = url_for('uploaded_logo', filename=filename) # URL para servir a logo
+                else:
+                    flash('Tipo de arquivo de logo inválido. Apenas PNG, JPG, JPEG, GIF, SVG são permitidos.', 'danger')
+                    db.session.rollback()
+                    return redirect(url_for('admin_settings'))
+            elif logo_url_input:
+                logo_path_to_save = logo_url_input
+            else:
+                # Se nenhum arquivo ou URL foi fornecido, verifica se é para limpar a logo existente
+                if request.form.get('clear_logo_impressao') == 'true':
+                    logo_path_to_save = "" # Limpa a URL
+                else:
+                    # Se não foi para limpar, mantém a URL existente
+                    config_logo_impressao_existente = Configuracao.query.filter_by(chave='logo_impressao_url').first()
+                    logo_path_to_save = config_logo_impressao_existente.valor if config_logo_impressao_existente else ""
+
+
+            config_logo_impressao = Configuracao.query.filter_by(chave='logo_impressao_url').first()
+            if config_logo_impressao:
+                config_logo_impressao.valor = logo_path_to_save
+            else:
+                config_logo_impressao = Configuracao(chave='logo_impressao_url', valor=logo_path_to_save, tipo='string', descricao='URL ou caminho da imagem da logo para cabeçalhos de impressão.')
+                db.session.add(config_logo_impressao)
+
+            # NOVO: Lógica para Meta de SLA
+            sla_meta_input = request.form.get('sla_meta_percentual', '').strip()
+            try:
+                sla_meta_int = int(sla_meta_input)
+                if not (0 <= sla_meta_int <= 100): # Limite entre 0 e 100
+                    flash('A meta de SLA deve ser entre 0 e 100%.', 'danger')
+                    db.session.rollback()
+                    return redirect(url_for('admin_settings'))
+            except ValueError:
+                flash('Meta de SLA inválida. Use um número inteiro.', 'danger')
+                db.session.rollback()
+                return redirect(url_for('admin_settings'))
+
+            config_sla_meta = Configuracao.query.filter_by(chave='sla_meta_percentual').first()
+            if config_sla_meta:
+                config_sla_meta.valor = str(sla_meta_int)
+            else:
+                config_sla_meta = Configuracao(chave='sla_meta_percentual', valor=str(sla_meta_int), tipo='integer', descricao='Meta percentual para o dashboard de SLA mensal.')
+                db.session.add(config_sla_meta)
+
+
+            db.session.commit() # Commit de todas as mudanças
+
             user = User.query.filter_by(username=session['username']).first()
             user_id = user.id if user else None
             new_log = Log(
                 action="UPDATE_ADMIN_SETTINGS",
-                details=f"Configurações gerais atualizadas: Data Limite Atrasos='{nova_data_str}', Clientes Excluídos='{clientes_excluidos_input}', Produtos Excluídos='{produtos_excluidos_input}'.",
+                details=f"Configurações gerais atualizadas: Data Limite Atrasos='{nova_data_str}', Clientes Excluídos='{clientes_excluidos_input}', Produtos Excluídos='{produtos_excluidos_input}', Intervalo Atualização='{intervalo_atualizacao_input} horas', Logo Impressão='{logo_path_to_save}', Meta SLA='{sla_meta_input}%'.",
                 user_id=user_id,
                 timestamp=datetime.utcnow()
             )
@@ -456,12 +538,14 @@ def admin_settings():
             flash(f'Erro ao salvar configurações: {str(e)}', 'danger')
             logger.error(f"Erro ao salvar configurações gerais: {str(e)}")
 
-    # No final da função GET, passe os novos valores para o template:
     return render_template(
         'admin_settings.html',
         data_limite_atraso=data_limite_atraso,
-        clientes_excluidos_str=clientes_excluidos_str, # NOVO
-        produtos_excluidos_str=produtos_excluidos_str  # NOVO
+        clientes_excluidos_str=clientes_excluidos_str,
+        produtos_excluidos_str=produtos_excluidos_str,
+        intervalo_atualizacao_horas=intervalo_atualizacao_horas,
+        logo_impressao_url=logo_impressao_url,
+        sla_meta_percentual=sla_meta_percentual # NOVO
     )
 
 
@@ -534,10 +618,22 @@ def principal():
     display_data = None
     data_length = 0
     resumo = []
+    ultima_carga_dt = None # Inicializa para o caso de não ter arquivo
+    proxima_atualizacao_dt = None # Inicializa para o caso de não ter arquivo
 
     if 'current_file' in session:
         try:
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
+
+            # NOVO: Lógica para data de carregamento e próxima atualização
+            ultima_carga_timestamp = os.path.getmtime(filepath)
+            ultima_carga_dt = datetime.fromtimestamp(ultima_carga_timestamp)
+
+            config_intervalo_atualizacao = Configuracao.query.filter_by(chave='intervalo_atualizacao_base_horas').first()
+            intervalo_horas = int(config_intervalo_atualizacao.valor) if config_intervalo_atualizacao and config_intervalo_atualizacao.valor.isdigit() else 24
+            
+            proxima_atualizacao_dt = ultima_carga_dt + timedelta(hours=intervalo_horas)
+            
             df = pd.read_excel(filepath)
 
             # NOVO: Recuperar clientes e produtos excluídos do DB
@@ -546,8 +642,6 @@ def principal():
 
             config_produtos_excluidos = Configuracao.query.filter_by(chave='produtos_excluidos').first()
             produtos_excluidos_do_db = json.loads(config_produtos_excluidos.valor) if config_produtos_excluidos and config_produtos_excluidos.valor else []
-
-            # REMOVIDO: df = filtrar_clientes_excluidos(df) # O filtro agora é feito dentro de analyze_pleitos
 
             df['Cliente'] = df['Cliente'].astype(str).str.strip()
             df['Consultor'] = df['Consultor'].astype(str).str.strip()
@@ -677,7 +771,9 @@ def principal():
         data_length=data_length,
         filter_column=session.get('filter_column', ''),
         filter_value=session.get('filter_value', ''),
-        resumo=resumo
+        resumo=resumo,
+        ultima_carga_dt=ultima_carga_dt, # NOVO
+        proxima_atualizacao_dt=proxima_atualizacao_dt # NOVO
     )
 
 
@@ -950,10 +1046,13 @@ def static_files(filename):
 
 
 @app.route('/calcular-multa', methods=['GET', 'POST'])
-@permission_required('can_access_cancelamento') # Acesso ao cálculo de multa
+@permission_required('can_access_cancelamento')
 def calcular_multa():
     if 'username' not in session:
         return redirect(url_for('login'))
+
+    config_logo_impressao = Configuracao.query.filter_by(chave='logo_impressao_url').first()
+    logo_impressao_url = config_logo_impressao.valor if config_logo_impressao else ""
 
     if request.method == 'POST':
         try:
@@ -962,27 +1061,32 @@ def calcular_multa():
             valor_servicos_str = request.form.get('valor_servicos')
             servico_rsfn = 'servico' in request.form and request.form['servico'] == 'rsfn'
             
-            # NOVO: Captura o percentual de multa personalizado
             multa_personalizada_str = request.form.get('multa_personalizada')
             percentual_multa_personalizada = None
             if multa_personalizada_str:
                 try:
-                    percentual_multa_personalizada = float(multa_personalizada_str) / 100.0 # Converte para fração
-                    if not (0 <= percentual_multa_personalizada <= 1): # Valida 0% a 100%
+                    percentual_multa_personalizada = float(multa_personalizada_str) / 100.0
+                    if not (0 <= percentual_multa_personalizada <= 1):
                         flash('Percentual de multa personalizado deve ser entre 0 e 100.', 'danger')
                         return redirect(url_for('calcular_multa'))
                 except ValueError:
                     flash('Percentual de multa personalizado inválido.', 'danger')
                     return redirect(url_for('calcular_multa'))
 
+            nome_cliente = request.form.get('nome_cliente', '').strip()
+            if not nome_cliente:
+                flash('O nome do cliente é obrigatório para o cálculo de multa.', 'danger')
+                return redirect(url_for('calcular_multa'))
 
             if not data_recebimento_str or not data_ativacao_str:
                 flash('Preencha todas as datas!', 'warning')
                 return redirect(url_for('calcular_multa'))
 
             try:
-                data_recebimento = datetime.strptime(data_recebimento_str, '%Y-%m-%d')
-                data_ativacao = datetime.strptime(data_ativacao_str, '%Y-%m-%d')
+                # REMOVIDO .date() redundante aqui
+                data_recebimento = datetime.strptime(data_recebimento_str, '%Y-%m-%d').date()
+                # REMOVIDO .date() redundante aqui
+                data_ativacao = datetime.strptime(data_ativacao_str, '%Y-%m-%d').date()
             except ValueError:
                 flash('Datas inválidas! Use o formato correto (AAAA-MM-DD).', 'danger')
                 return redirect(url_for('calcular_multa'))
@@ -990,7 +1094,6 @@ def calcular_multa():
             if data_ativacao > data_recebimento:
                 flash('A data de ativação não pode ser depois da data de recebimento da carta.', 'danger')
                 return redirect(url_for('calcular_multa'))
-
 
             try:
                 valor_servicos = float(valor_servicos_str)
@@ -1003,44 +1106,44 @@ def calcular_multa():
 
             if servico_rsfn:
                 prazo_contrato = 1
-                percentual_multa = 0.50 # Fixo para RSFN
+                percentual_multa = 0.50
                 aviso_previo = 0
             else:
                 try:
                     prazo_contrato = int(request.form.get('prazo_contrato'))
                     aviso_previo_val = request.form.get('aviso_custom') or request.form.get('aviso_previo')
-                    aviso_previo = int(aviso_previo_val) if aviso_previo_val else 0 # Certifica que é um int
+                    aviso_previo = int(aviso_previo_val) if aviso_previo_val else 0
                 except (TypeError, ValueError):
                     flash('Prazo contratual e aviso prévio inválidos.', 'danger')
                     return redirect(url_for('calcular_multa'))
 
-            data_fim_contrato = data_ativacao + relativedelta(years=prazo_contrato) - timedelta(days=1)
+            # REMOVIDO .date() redundante aqui
+            data_fim_contrato = (data_ativacao + relativedelta(years=prazo_contrato)) - timedelta(days=1)
             prazo_total_dias = (data_fim_contrato - data_ativacao).days + 1
             data_inicio_aviso = data_recebimento
             data_termino_aviso = data_recebimento + timedelta(days=aviso_previo)
-            data_inicio_multa = data_termino_aviso # Altera para ser igual à data_termino_aviso
-            data_cancelamento = data_termino_aviso # Altera para ser igual à data_termino_aviso
-            prazo_cumprido = (data_cancelamento - data_ativacao).days # Importante: usar data_cancelamento aqui
+            data_inicio_multa = data_termino_aviso
+            data_cancelamento = data_termino_aviso
+            prazo_cumprido = (data_cancelamento - data_ativacao).days
             prazo_faltante = prazo_total_dias - prazo_cumprido
-            valor_diario = valor_servicos / 30 if valor_servicos else 0 # Usando 30 dias para valor diário
 
-            # LÓGICA DO PERCENTUAL DE MULTA
+            valor_diario = valor_servicos / 30 if valor_servicos else 0
+
             if percentual_multa_personalizada is not None:
-                percentual_multa = percentual_multa_personalizada # Usa o valor personalizado
-                percentual_multa_display = percentual_multa * 100 # Para exibir
+                percentual_multa = percentual_multa_personalizada
+                percentual_multa_display = percentual_multa * 100
             elif servico_rsfn:
                 percentual_multa = 0.50
                 percentual_multa_display = 50
             else:
-                prazo_cumprido_anos = prazo_cumprido / 365.25 # Usar 365.25 para consistência com JS
+                prazo_cumprido_anos = prazo_cumprido / 365.25
                 if prazo_cumprido_anos < 1:
                     percentual_multa = 0.50
                 elif prazo_cumprido_anos < 2:
                     percentual_multa = 0.40
                 else:
                     percentual_multa = 0.30
-                percentual_multa_display = percentual_multa * 100 # Para exibir
-
+                percentual_multa_display = percentual_multa * 100
 
             if servico_rsfn:
                 valor_multa = valor_servicos * 0.5
@@ -1052,25 +1155,49 @@ def calcular_multa():
                 valor_multa = valor_diario * prazo_faltante * percentual_multa
                 paga_multa = valor_multa > 0
 
-            nome_cliente = request.form.get('nome_cliente', '').strip()
             codigo_controle = str(uuid4())[:8]
 
             user = User.query.filter_by(username=session['username']).first()
             user_id = user.id if user else None
 
+            novo_cancelamento = Cancelamento(
+                codigo_controle=codigo_controle,
+                nome_cliente=nome_cliente,
+                servico_rsfn=servico_rsfn,
+                data_recebimento=data_recebimento,
+                data_ativacao=data_ativacao,
+                aviso_previo_dias=aviso_previo,
+                prazo_contrato_anos=prazo_contrato,
+                valor_servicos=valor_servicos,
+                percentual_multa_aplicado=percentual_multa_display,
+                valor_multa=valor_multa,
+                paga_multa=paga_multa,
+                data_calculo=datetime.utcnow(),
+                data_fim_contrato=data_fim_contrato,
+                data_cancelamento_efetivo=data_cancelamento,
+                prazo_cumprido_dias=prazo_cumprido,
+                prazo_faltante_dias=prazo_faltante,
+                valor_diario_produto=valor_diario,
+                user_id=user_id
+            )
+            db.session.add(novo_cancelamento)
+            db.session.commit()
+
             log_action = "CALCULO_MULTA"
-            # Detalhes do log para incluir se foi personalizada a multa
             log_details = (
                 f"Serviço RSFN: {'Sim' if servico_rsfn else 'Não'} | "
                 f"Multa: {percentual_multa_display:.0f}% {'(personalizada)' if percentual_multa_personalizada is not None else '(automática)'} | "
-                f"Valor: R$ {valor_multa:.2f}"
+                f"Valor: R$ {valor_multa:.2f} | "
+                f"Cliente: {nome_cliente} | "
+                f"Código: {codigo_controle} | "
+                f"ID do Cancelamento: {novo_cancelamento.id}"
             )
             new_log = Log(
                 action=log_action,
                 details=log_details,
                 user_id=user_id,
                 codigo_controle=codigo_controle,
-                nome_cliente=nome_cliente if nome_cliente else None,
+                nome_cliente=nome_cliente,
                 timestamp=datetime.utcnow()
             )
             db.session.add(new_log)
@@ -1093,11 +1220,12 @@ def calcular_multa():
                 prazo_faltante=prazo_faltante,
                 data_cancelamento=data_cancelamento.strftime('%d/%m/%Y'),
                 data_fim_contrato=data_fim_contrato.strftime('%d/%m/%Y'),
-                percentual_multa=percentual_multa_display, # Passa o valor já em % para o template
+                percentual_multa=percentual_multa_display,
                 valor_multa=valor_multa,
                 data_calculo=datetime.now().strftime('%d/%m/%Y às %H:%M'),
                 codigo_controle=codigo_controle,
-                nome_cliente=nome_cliente
+                nome_cliente=nome_cliente,
+                logo_impressao_url=logo_impressao_url
             )
         except Exception as e:
             flash(f'Erro no cálculo: {str(e)}', 'danger')
@@ -1115,7 +1243,7 @@ def calcular_multa():
             return redirect(url_for('calcular_multa'))
 
     hoje = datetime.now().strftime('%Y-%m-%d')
-    return render_template('calcular_multa.html', hoje=hoje)
+    return render_template('calcular_multa.html', hoje=hoje, logo_impressao_url=logo_impressao_url)
 
 # app.py (trecho da rota /monitor_juridico)
 
@@ -1577,249 +1705,316 @@ MESES_NOME = {
 MESES_NOME_INV = {v: k for k, v in MESES_NOME.items()}
 
 @app.route('/sla_dashboard', methods=['GET', 'POST'])
-@permission_required('can_access_sla') # Acesso ao dashboard SLA
+@permission_required('can_access_sla')
 def sla_dashboard():
     if 'username' not in session:
+        flash('Você precisa estar logado para acessar esta página.', 'danger')
         return redirect(url_for('login'))
-
-    if 'sla_resultados' not in session:
-        session['sla_resultados'] = []
-    resultados = session['sla_resultados']
-    meta = session.get('sla_meta', 90)
-    mensagem = None
-
+    
     user = User.query.filter_by(username=session['username']).first()
     user_id = user.id if user else None
 
+    config_sla_meta = Configuracao.query.filter_by(chave='sla_meta_percentual').first()
+    meta = float(config_sla_meta.valor) if config_sla_meta and config_sla_meta.valor and config_sla_meta.valor.replace('.', '', 1).isdigit() else 90.0
+
+    MESES_NOME = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+
     if request.method == 'POST':
         acao = request.form.get('acao')
+        ano_atual = datetime.now().year
 
-        if not acao:
-            # Ação de adicionar mês - verifica permissão de edição/upload para SLA
-            if not session.get('can_edit_sla'): # Ou can_edit_all
+        if acao == 'adicionar_mes':
+            if not session.get('can_edit_sla'):
                 flash('Você não tem permissão para adicionar dados ao Dashboard SLA.', 'danger')
                 return redirect(url_for('sla_dashboard'))
 
-            try:
-                mes = int(request.form.get('mes'))
-                qtd_dentro = int(request.form.get('qtd_dentro_sla') or 0)
-                qtd_fora = int(request.form.get('qtd_fora_sla') or 0)
-                qtd_proc = int(request.form.get('qtd_processos') or (qtd_dentro + qtd_fora))
-                realizado = (qtd_dentro / qtd_proc) * 100 if qtd_proc > 0 else 0
+            mes = request.form.get('mes')
+            qtd_dentro_sla = request.form.get('qtd_dentro_sla')
+            qtd_fora_sla = request.form.get('qtd_fora_sla')
+            qtd_processos = request.form.get('qtd_processos')
+            realizado = request.form.get('realizado')
 
-                mes_nome = MESES_NOME[mes]
-                if any(r['mes_nome'] == mes_nome for r in resultados):
-                    flash('Esse mês já foi preenchido.', 'warning')
-                else:
-                    resultados.append({
-                        'mes': mes,
-                        'mes_nome': mes_nome,
-                        'qtd_dentro_sla': qtd_dentro,
-                        'qtd_fora_sla': qtd_fora,
-                        'qtd_processos': qtd_proc,
-                        'realizado': realizado,
-                        'meta': meta
-                    })
-                    resultados.sort(key=lambda x: x['mes'])
-                    session['sla_resultados'] = resultados
-                    flash(f'Dados de {mes_nome} adicionados com sucesso!', 'success')
-                    new_log = Log(
-                        action="SLA_ADD_MES",
-                        details=f"Dados SLA adicionados para {mes_nome}: Dentro={qtd_dentro}, Fora={qtd_fora}, Processos={qtd_proc}, Realizado={realizado:.2f}%",
-                        user_id=user_id,
-                        timestamp=datetime.utcnow()
-                    )
-                    db.session.add(new_log)
-                    db.session.commit()
-            except Exception as e:
-                flash(f"Dados inválidos para o mês: {str(e)}.", "danger")
-                logger.error(f"Erro ao adicionar dados SLA: {str(e)}")
+            if not all([mes, qtd_dentro_sla, qtd_fora_sla, qtd_processos, realizado]):
+                flash('Por favor, preencha todos os campos.', 'danger')
+                return redirect(url_for('sla_dashboard'))
+            
+            try:
+                mes = int(mes)
+                qtd_dentro_sla = int(qtd_dentro_sla)
+                qtd_fora_sla = int(qtd_fora_sla)
+                qtd_processos = int(qtd_processos)
+                realizado = float(realizado)
+            except ValueError:
+                flash('Valores inválidos para os campos numéricos.', 'danger')
+                return redirect(url_for('sla_dashboard'))
+
+            existing_sla = SlaMensal.query.filter_by(mes=mes, ano=ano_atual).first()
+            if existing_sla:
+                existing_sla.qtd_dentro_sla = qtd_dentro_sla
+                existing_sla.qtd_fora_sla = qtd_fora_sla
+                existing_sla.qtd_processos = qtd_processos
+                existing_sla.realizado_percentual = realizado
+                existing_sla.meta_percentual = meta
+                flash(f'Dados de SLA para {MESES_NOME.get(mes)} de {ano_atual} atualizados com sucesso!', 'success')
+                log_action = "SLA_ATUALIZADO"
+                log_details = f"Dados de SLA para {MESES_NOME.get(mes)}/{ano_atual} atualizados. Realizado: {realizado:.2f}%." # 'MESES_NOME' corrigido
+            else:
+                new_sla = SlaMensal(
+                    mes=mes,
+                    ano=ano_atual,
+                    qtd_dentro_sla=qtd_dentro_sla,
+                    qtd_fora_sla=qtd_fora_sla,
+                    qtd_processos=qtd_processos,
+                    realizado_percentual=realizado,
+                    meta_percentual=meta
+                )
+                db.session.add(new_sla)
+                flash(f'Dados de SLA para {MESES_NOME.get(mes)} de {ano_atual} adicionados com sucesso!', 'success')
+                log_action = "SLA_ADICIONADO"
+                log_details = f"Dados SLA adicionados para {MESES_NOME.get(mes)}/{ano_atual} adicionados. Realizado: {realizado:.2f}%." # 'MESES_NOME' corrigido
+            
+            db.session.commit()
+            new_log = Log(
+                action=log_action,
+                details=log_details,
+                user_id=user_id,
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(new_log)
+            db.session.commit()
+            return redirect(url_for('sla_dashboard'))
 
         elif acao == 'limpar':
-            if not session.get('can_edit_sla'): # Ou can_edit_all
-                flash('Você não tem permissão para limpar os resultados do Dashboard SLA.', 'danger')
+            if not session.get('can_edit_sla'):
+                flash('Você não tem permissão para limpar o Dashboard SLA.', 'danger')
                 return redirect(url_for('sla_dashboard'))
-
-            session['sla_resultados'] = []
-            resultados = []
-            flash('Resultados limpos!', 'info')
+            
+            SlaMensal.query.filter_by(ano=ano_atual).delete()
+            db.session.commit()
+            flash(f'Todos os dados de SLA para o ano {ano_atual} foram limpos.', 'warning')
             new_log = Log(
-                action="SLA_LIMPAR_RESULTADOS",
-                details="Todos os resultados do Dashboard SLA foram limpos.",
+                action="SLA_LIMPO",
+                details=f"Todos os dados de SLA para o ano {ano_atual} foram limpos.",
                 user_id=user_id,
                 timestamp=datetime.utcnow()
             )
             db.session.add(new_log)
             db.session.commit()
-
-        elif acao == 'definir_meta':
-            if not session.get('can_edit_sla'): # Ou can_edit_all
-                flash('Você não tem permissão para definir a meta do Dashboard SLA.', 'danger')
-                return redirect(url_for('sla_dashboard'))
-
-            meta_input = request.form.get('meta_mensal')
-            try:
-                meta_input = int(meta_input)
-                if 70 <= meta_input <= 100:
-                    session['sla_meta'] = meta_input
-                    meta = meta_input
-                    for r in resultados:
-                        r['meta'] = meta
-                    flash(f"Meta mensal definida como {meta_input}%", 'success')
-                    new_log = Log(
-                        action="SLA_DEFINIR_META",
-                        details=f"Meta mensal do SLA definida para {meta_input}%.",
-                        user_id=user_id,
-                        timestamp=datetime.utcnow()
-                    )
-                    db.session.add(new_log)
-                    db.session.commit()
-                else:
-                    flash("Meta fora do intervalo permitido (70% a 100%).", 'warning')
-            except Exception as e:
-                flash(f"Meta inválida: {str(e)}.", 'danger')
-                logger.error(f"Erro ao definir meta SLA: {str(e)}")
+            return redirect(url_for('sla_dashboard'))
 
         elif acao == 'exportar_excel':
-            # Permissão para exportar, geralmente 'can_access_sla' já cobre
-            if not resultados or len(resultados) == 0:
-                flash('Adicione pelo menos uma linha antes de exportar para Excel!', 'warning')
+            if not session.get('can_access_sla'): # Usar a permissão de acesso, ou criar uma 'can_export_data' se for mais granular
+                flash('Você não tem permissão para exportar dados.', 'danger')
                 return redirect(url_for('sla_dashboard'))
-            df = pd.DataFrame(resultados)
-            output = io.BytesIO()
-            exportar_sla_excel(df, output)
-            output.seek(0)
             
-            filename = f'dashboard_sla_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            all_sla_data = SlaMensal.query.filter_by(ano=ano_atual).order_by(SlaMensal.mes).all()
+            data_for_excel = []
+            for s in all_sla_data:
+                data_for_excel.append({
+                    'mes_nome': MESES_NOME.get(s.mes),
+                    'qtd_dentro_sla': s.qtd_dentro_sla,
+                    'qtd_fora_sla': s.qtd_fora_sla,
+                    'qtd_processos': s.qtd_processos,
+                    'realizado': s.realizado_percentual, # Será arredondado no excel_export.py
+                    'meta': s.meta_percentual # Será arredondado no excel_export.py
+                })
+            
+            df = pd.DataFrame(data_for_excel)
+            output = BytesIO()
+            # exportar_sla_excel (função de utils/excel_export.py) já fará o arredondamento
+            exportar_sla_excel(df, output) 
+            output.seek(0)
+
             new_log = Log(
-                action="SLA_EXPORTAR_EXCEL",
-                details=f"Dashboard SLA exportado para Excel: '{filename}'.",
+                action="SLA_EXPORT_EXCEL",
+                details=f"Dados de SLA para o ano {ano_atual} exportados para Excel.",
                 user_id=user_id,
                 timestamp=datetime.utcnow()
             )
             db.session.add(new_log)
             db.session.commit()
 
-            return send_file(output, download_name=filename, as_attachment=True)
+            return send_file(output, download_name=f'sla_mensal_{ano_atual}.xlsx', as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
         elif acao == 'exportar_pdf':
-            # Permissão para exportar, geralmente 'can_access_sla' já cobre
-            if not resultados or len(resultados) == 0:
-                flash('Adicione pelo menos uma linha antes de exportar para PDF!', 'warning')
+            if not session.get('can_access_sla'): # Usar a permissão de acesso, ou criar uma 'can_export_data' se for mais granular
+                flash('Você não tem permissão para exportar dados.', 'danger')
                 return redirect(url_for('sla_dashboard'))
-            now = datetime.now().strftime('%d/%m/%Y %H:%M')
-            output = io.BytesIO()
-            exportar_sla_pdf(resultados, output, meta=meta, datahora=now)
-            output.seek(0)
 
-            filename = f'dashboard_sla_{now.replace("/","-").replace(":","-")}.pdf'
+            all_sla_data = SlaMensal.query.filter_by(ano=ano_atual).order_by(SlaMensal.mes).all()
+            resultados_para_pdf = []
+            for s in all_sla_data:
+                resultados_para_pdf.append({
+                    'mes_nome': MESES_NOME.get(s.mes),
+                    'qtd_dentro_sla': s.qtd_dentro_sla,
+                    'qtd_fora_sla': s.qtd_fora_sla,
+                    'qtd_processos': s.qtd_processos,
+                    'realizado': s.realizado_percentual, # Será arredondado no pdf_generator.py
+                    'meta': s.meta_percentual # Será arredondado no pdf_generator.py
+                })
+
+            # A função exportar_sla_pdf precisa da lista de resultados e da meta.
+            # Se você tiver uma logo_url, passe-a.
+            # Verifique os parâmetros de 'exportar_sla_pdf' em utils/pdf_generator.py
+            pdf_output = io.BytesIO()
+            exportar_sla_pdf(resultados_para_pdf, pdf_output, meta=meta, datahora=datetime.now().strftime('%d/%m/%Y %H:%M'))
+            pdf_output.seek(0)
+
             new_log = Log(
-                action="SLA_EXPORTAR_PDF",
-                details=f"Dashboard SLA exportado para PDF: '{filename}'.",
+                action="SLA_EXPORT_PDF",
+                details=f"Dados de SLA para o ano {ano_atual} exportados para PDF.",
                 user_id=user_id,
                 timestamp=datetime.utcnow()
             )
             db.session.add(new_log)
             db.session.commit()
 
-            return send_file(output, download_name=filename, as_attachment=True)
+            return send_file(pdf_output, download_name=f'sla_mensal_{ano_atual}.pdf', as_attachment=True, mimetype='application/pdf')
 
         elif acao == 'importar_excel':
-            if not session.get('can_upload_all'): # Ou can_upload_sla, se mais específico
+            if not session.get('can_upload_all'):
                 flash('Você não tem permissão para importar dados para o Dashboard SLA.', 'danger')
                 return redirect(url_for('sla_dashboard'))
 
-            file = request.files.get('importar_excel')
-            if file:
+            if 'importar_excel' not in request.files:
+                flash('Nenhum arquivo selecionado.', 'danger')
+                return redirect(url_for('sla_dashboard'))
+            
+            file = request.files['importar_excel']
+            if file.filename == '':
+                flash('Nenhum arquivo selecionado.', 'danger')
+                return redirect(url_for('sla_dashboard'))
+            
+            # Ajuste para permitir 'xls' também, se a função allowed_file permitir.
+            # Verifique a função allowed_file se é necessário ajustar para 'xlsx' apenas.
+            if file and (file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls')): 
                 try:
                     df = pd.read_excel(file)
-                    colunas_esperadas = ['Mês', 'Qtd. Dentro SLA', 'Qtd. Fora SLA', 'Qtd. Processos', 'Realizado (%)', 'Meta (%)']
-                    if not all(col in df.columns for col in colunas_esperadas):
-                        flash("Planilha incompatível! Utilize um arquivo gerado pela própria exportação.", "danger")
-                    else:
-                        session['sla_resultados'] = []
-                        for _, row in df.iterrows():
-                            mes_nome = str(row['Mês'])
-                            mes = MESES_NOME_INV.get(mes_nome, None)
-                            if mes is not None:
-                                try:
-                                    qtd_dentro = float(str(row['Qtd. Dentro SLA']).replace(',', '.'))
-                                    qtd_processos = float(str(row['Qtd. Processos']).replace(',', '.'))
-                                    realizado = (qtd_dentro / qtd_processos) * 100 if qtd_processos > 0 else 0
-                                except Exception:
-                                    qtd_dentro = qtd_processos = realizado = 0
-                                session['sla_resultados'].append({
-                                    'mes': mes,
-                                    'mes_nome': mes_nome,
-                                    'qtd_dentro_sla': qtd_dentro,
-                                    'qtd_fora_sla': float(str(row['Qtd. Fora SLA']).replace(',', '.')),
-                                    'qtd_processos': qtd_processos,
-                                    'realizado': realizado,
-                                    'meta': float(str(row.get('Meta (%)', meta)).replace(',', '.'))
-                                })
-                        session['sla_resultados'].sort(key=lambda x: x['mes'])
-                        flash('Excel importado com sucesso!', 'success')
-                        new_log = Log(
-                            action="SLA_IMPORTAR_EXCEL",
-                            details=f"Dashboard SLA importado do arquivo '{file.filename}'.",
-                            user_id=user_id,
-                            timestamp=datetime.utcnow()
-                        )
-                        db.session.add(new_log)
-                        db.session.commit()
+                    
+                    col_mapping = {
+                        'Mês': 'mes',
+                        'Qtd. Dentro SLA': 'qtd_dentro_sla',
+                        'Qtd. Fora SLA': 'qtd_fora_sla',
+                        'Qtd. Processos': 'qtd_processos',
+                        'Realizado (%)': 'realizado_percentual',
+                        'Meta (%)': 'meta_percentual'
+                    }
+                    df.rename(columns=col_mapping, inplace=True)
+
+                    meses_reverso = {v.lower(): k for k, v in MESES_NOME.items()}
+                    df['mes'] = df['mes'].apply(lambda x: meses_reverso.get(str(x).lower(), None))
+
+                    required_cols = ['mes', 'qtd_dentro_sla', 'qtd_fora_sla', 'qtd_processos', 'realizado_percentual', 'meta_percentual']
+                    if not all(col in df.columns for col in required_cols):
+                        flash('O arquivo Excel não contém todas as colunas necessárias: Mês, Qtd. Dentro SLA, Qtd. Fora SLA, Qtd. Processos, Realizado (%), Meta (%).', 'danger')
+                        return redirect(url_for('sla_dashboard'))
+
+                    imported_count = 0
+                    updated_count = 0
+                    for index, row in df.iterrows():
+                        mes = row['mes']
+                        if pd.isna(mes): 
+                            continue
+                        mes = int(mes)
+
+                        existing_sla = SlaMensal.query.filter_by(mes=mes, ano=ano_atual).first()
+                        
+                        qtd_dentro_sla = int(row['qtd_dentro_sla']) if pd.notna(row['qtd_dentro_sla']) else 0
+                        qtd_fora_sla = int(row['qtd_fora_sla']) if pd.notna(row['qtd_fora_sla']) else 0
+                        qtd_processos = int(row['qtd_processos']) if pd.notna(row['qtd_processos']) else 0
+                        realizado_percentual = float(row['realizado_percentual']) if pd.notna(row['realizado_percentual']) else 0.0
+                        meta_percentual = float(row['meta_percentual']) if pd.notna(row['meta_percentual']) else meta 
+
+                        if existing_sla:
+                            existing_sla.qtd_dentro_sla = qtd_dentro_sla
+                            existing_sla.qtd_fora_sla = qtd_fora_sla
+                            existing_sla.qtd_processos = qtd_processos
+                            existing_sla.realizado_percentual = realizado_percentual
+                            existing_sla.meta_percentual = meta_percentual
+                            updated_count += 1
+                        else:
+                            new_sla = SlaMensal(
+                                mes=mes,
+                                ano=ano_atual,
+                                qtd_dentro_sla=qtd_dentro_sla,
+                                qtd_fora_sla=qtd_fora_sla,
+                                qtd_processos=qtd_processos,
+                                realizado_percentual=realizado_percentual,
+                                meta_percentual=meta_percentual
+                            )
+                            db.session.add(new_sla)
+                            imported_count += 1
+                    
+                    db.session.commit()
+                    flash(f'Importação concluída! {imported_count} registros adicionados, {updated_count} atualizados.', 'success')
+                    new_log = Log(
+                        action="SLA_IMPORT_EXCEL",
+                        details=f"Importados {imported_count} e atualizados {updated_count} registros de SLA para o ano {ano_atual} via Excel.",
+                        user_id=user_id,
+                        timestamp=datetime.utcnow()
+                    )
+                    db.session.add(new_log)
+                    db.session.commit()
+
                 except Exception as e:
-                    flash("Erro ao importar: " + str(e), "danger")
-                    logger.error(f"Erro ao importar SLA Excel: {str(e)}")
+                    db.session.rollback()
+                    flash(f'Erro ao processar o arquivo Excel: {str(e)}', 'danger')
+                    # Log de erro: logger.error(f"Erro ao importar SLA Excel: {str(e)}")
             else:
-                flash("Arquivo não selecionado para importação!", "danger")
+                flash('Formato de arquivo inválido. Por favor, use .xlsx ou .xls', 'danger')
+            
+            return redirect(url_for('sla_dashboard'))
 
         elif acao == 'fechar_ano':
-            if not session.get('can_edit_sla'): # Ou can_edit_all
+            if not session.get('can_edit_sla'):
                 flash('Você não tem permissão para fechar o ano do Dashboard SLA.', 'danger')
                 return redirect(url_for('sla_dashboard'))
-
-            if len(resultados) == 12:
-                valores_realizados = []
-                for r in resultados:
-                    try:
-                        val = float(str(r['realizado']).replace(',', '.'))
-                        valores_realizados.append(val)
-                    except Exception:
-                        pass
+            
+            all_sla_data = SlaMensal.query.filter_by(ano=ano_atual).order_by(SlaMensal.mes).all()
+            if len(all_sla_data) == 12:
+                valores_realizados = [s.realizado_percentual for s in all_sla_data if s.realizado_percentual is not None]
                 if valores_realizados:
-                    media_ano = statistics.median(valores_realizados)
+                    media_ano = statistics.median(valores_realizados) 
                 else:
                     media_ano = 0
-                flash(f"Ano fechado! Média do ano: {media_ano:.2f}%", 'success')
+                
+                flash(f"Ano fiscal {ano_atual} fechado! Mediana do ano: {media_ano:.2f}%", 'success')
                 new_log = Log(
                     action="SLA_FECHAR_ANO",
-                    details=f"Ano fiscal do Dashboard SLA fechado. Média anual: {media_ano:.2f}%.",
+                    details=f"Ano fiscal do Dashboard SLA {ano_atual} fechado. Mediana anual: {media_ano:.2f}%.",
                     user_id=user_id,
                     timestamp=datetime.utcnow()
                 )
                 db.session.add(new_log)
                 db.session.commit()
             else:
-                flash("Ainda não há 12 meses preenchidos para fechar o ano.", 'warning')
-
-    valores_realizados = []
-    if resultados:
-        for r in resultados:
-            try:
-                val = float(str(r['realizado']).replace(',', '.'))
-                valores_realizados.append(val)
-            except Exception:
-                pass
-    if valores_realizados:
-        media_realizado = statistics.median(valores_realizados)
-    else:
-        media_realizado = 0
+                flash(f"Ainda não há 12 meses preenchidos ({len(all_sla_data)} de 12) para fechar o ano {ano_atual}.", 'warning')
+    
+    # Carrega todos os resultados do SLA para o ano atual do banco de dados
+    all_sla_data = SlaMensal.query.filter_by(ano=datetime.now().year).order_by(SlaMensal.mes).all()
+    resultados = []
+    for s in all_sla_data:
+        resultados.append({
+            'mes': s.mes,
+            'mes_nome': MESES_NOME.get(s.mes),
+            'qtd_dentro_sla': s.qtd_dentro_sla,
+            'qtd_fora_sla': s.qtd_fora_sla,
+            'qtd_processos': s.qtd_processos,
+            'realizado': s.realizado_percentual,
+            'meta': s.meta_percentual
+        })
+    
+    valores_realizados_para_media = [r['realizado'] for r in resultados if r['realizado'] is not None]
+    media_realizado = statistics.median(valores_realizados_para_media) if valores_realizados_para_media else 0 
 
     return render_template(
         'sla_dashboard.html',
-        resultados=session.get('sla_resultados', []),
-        meta=session.get('sla_meta', 90),
-        mensagem=mensagem,
+        resultados=resultados,
+        meta=int(meta),
         media_realizado=media_realizado,
         meses_nome={v: k for k, v in MESES_NOME.items()}
     )
@@ -2140,6 +2335,9 @@ def consulta_cnpj():
 
     return render_template('consulta_cnpj.html', resultado=resultado, erro=erro, cnpj_input=cnpj_input)
 
+@app.route('/logos/<filename>')
+def uploaded_logo(filename):
+    return send_from_directory(app.config['UPLOAD_LOGO_FOLDER'], filename)
 
 # ============= INICIALIZAÇÃO =============
 if __name__ == '__main__':

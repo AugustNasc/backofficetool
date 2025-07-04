@@ -12,7 +12,7 @@
         </h2>
     </div>
     <div class="card-body">
-        <form method="POST" action="{{ url_for('admin_settings') }}">
+        <form method="POST" action="{{ url_for('admin_settings') }}" enctype="multipart/form-data">
             <h4 class="mb-3">Configuração de Pleitos Atrasados</h4>
             <div class="mb-3">
                 <label for="data_limite_pleitos_atrasados" class="form-label">
@@ -26,7 +26,7 @@
                 </div>
             </div>
 
-            {# NOVO: Configuração para Clientes Excluídos #}
+            {# Configuração para Clientes Excluídos (JÁ EXISTENTE) #}
             <h4 class="mb-3 mt-4">Clientes Excluídos da Análise</h4>
             <div class="mb-3">
                 <label for="clientes_excluidos_input" class="form-label">
@@ -40,7 +40,7 @@
                 </div>
             </div>
 
-            {# NOVO: Configuração para Produtos Excluídos #}
+            {# Configuração para Produtos Excluídos (JÁ EXISTENTE) #}
             <h4 class="mb-3 mt-4">Produtos Excluídos da Análise</h4>
             <div class="mb-3">
                 <label for="produtos_excluidos_input" class="form-label">
@@ -51,6 +51,70 @@
                           placeholder="Ex: TAXA DE SERVICO, PRODUTO OBSOLETO">{{ produtos_excluidos_str }}</textarea>
                 <div class="form-text">
                     Partes do nome do produto (ex: "taxa") que devem ser ignoradas na análise de pleitos. Separe por vírgula.
+                </div>
+            </div>
+
+            {# NOVO: Configuração para Intervalo de Atualização da Base #}
+            <h4 class="mb-3 mt-4">Intervalo de Atualização da Base de Pleitos</h4>
+            <div class="mb-3">
+                <label for="intervalo_atualizacao_base_horas" class="form-label">
+                    Frequência de Atualização (em horas):
+                </label>
+                <input type="number" class="form-control" id="intervalo_atualizacao_base_horas"
+                       name="intervalo_atualizacao_base_horas" min="1" max="720"
+                       value="{{ intervalo_atualizacao_horas }}" required>
+                <div class="form-text">
+                    Estimativa para a próxima atualização da base de pleitos. Use um valor entre 1 e 720 horas (30 dias).
+                </div>
+            </div>
+
+            {# NOVO: Configuração para Logo na Impressão #}
+            <h4 class="mb-3 mt-4">Logo para Impressão (Cálculo de Multa)</h4>
+            <div class="mb-3">
+                <label for="logo_impressao_file" class="form-label">
+                    Upload de Imagem (PNG, JPG, GIF, SVG - máx. 16MB):
+                </label>
+                <input type="file" class="form-control" id="logo_impressao_file"
+                       name="logo_impressao_file" accept=".png,.jpg,.jpeg,.gif,.svg">
+                <div class="form-text mb-2">
+                    Envie uma nova logo. Se uma logo já existir, esta a substituirá.
+                </div>
+
+                <label for="logo_impressao_url_manual" class="form-label">
+                    Ou insira uma URL da Logo (se não for fazer upload):
+                </label>
+                <input type="text" class="form-control" id="logo_impressao_url_manual"
+                       name="logo_impressao_url_manual" placeholder="Ex: https://example.com/logo.png"
+                       value="{{ logo_impressao_url }}">
+                <div class="form-text mb-2">
+                    Se preenchido, esta URL será usada em vez de uma imagem carregada.
+                </div>
+
+                {% if logo_impressao_url %}
+                <div class="mt-3">
+                    <p>Logo Atual:</p>
+                    <img src="{{ logo_impressao_url }}" alt="Logo Atual" style="max-width: 150px; border: 1px solid #ddd; padding: 5px; background: #fff;">
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="clear_logo_impressao" name="clear_logo_impressao" value="true">
+                        <label class="form-check-label" for="clear_logo_impressao">
+                            Remover Logo Atual
+                        </label>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            {# NOVO: Configuração para Meta de SLA #}
+            <h4 class="mb-3 mt-4">Meta de SLA Mensal</h4>
+            <div class="mb-3">
+                <label for="sla_meta_percentual" class="form-label">
+                    Meta de SLA Mensal (%):
+                </label>
+                <input type="number" class="form-control" id="sla_meta_percentual"
+                       name="sla_meta_percentual" min="0" max="100"
+                       value="{{ sla_meta_percentual }}" required>
+                <div class="form-text">
+                    Defina a meta percentual para o SLA mensal (valor entre 0 e 100).
                 </div>
             </div>
 

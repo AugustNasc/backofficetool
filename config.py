@@ -10,5 +10,6 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'AS212AHUSUH111!@!@UHSAUH@@@SAU2121a21UHS33AUHSAUHSAUH##AUHS')
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', f'sqlite:///{BASE_DIR}/instance/backoffice.db')
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+    UPLOAD_LOGO_FOLDER = os.path.join(BASE_DIR, 'logos') # NOVO: Caminho para a pasta de logos
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
-    SQLALCHEMY_TRACK_MODIFICATIONS = False  
+    SQLALCHEMY_TRACK_MODIFICATIONS = False

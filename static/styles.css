@@ -649,7 +649,7 @@ body.dark-mode .badge.status-concluida {
 body.dark-mode .badge.bg-danger,
 body.dark-mode .badge.status-atrasada {
     background: #402024 !important;
-    color: #ffbdbd !important;
+    color: #ffbcbc !important;
 }
 body.dark-mode .badge.bg-warning,
 body.dark-mode .badge.status-quase-atrasando {
@@ -674,7 +674,7 @@ tr.table-success,
 .table > tbody > tr.table-success,
 .table-success > td,
 .table-success > th {
-    background-color: #d1f4d6 !important; /* Verde Bootstrap light, ou escolha seu tom */
+    background-color: #d1f4d6 !important; /* Verde Bootstrap light, ou escolha seu tone */
     color: #1a3a20 !important;
 }
 
