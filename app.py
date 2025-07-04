@@ -1385,17 +1385,31 @@ def monitor_juridico():
                         logger.warning(f"Linha {index+2} da planilha ignorada: Data de Criação inválida.")
                         continue # Pula linhas com data inválida
 
-                    # Filtra apenas as linhas com o tipo 'Squad Contratação' OU 'Outros' (ANÁLISE DE CONTRATO ou SOLICITAÇÃO DE DOCUMENTO)
-                    # OU 'LIBERAÇÃO DE FLUXO' (Assunto)
+                    # Normaliza e filtra as linhas com o tipo 'Squad Contratação' OU 'Outros' (com filtro de assunto) OU 'LIBERAÇÃO DE FLUXO' (Assunto)
                     tipo_str = str(row.get('Tipo', '')).strip().lower()
                     assunto_str = str(row.get('Assunto', '')).strip().lower()
 
+                    # Condições para incluir a atividade:
                     is_squad_contratacao = tipo_str == 'squad contratação'
-                    is_outros = tipo_str == 'outros' # Nova variável para incluir apenas "Outros"
                     is_liberacao_fluxo = 'liberação de fluxo' in assunto_str
+                    
+                    is_outros_valido = False
+                    if tipo_str == 'outros':
+                        assuntos_validos_outros = [
+                            'análise de contrato', 'analise de contrato', 
+                            'elaboração de documentos', 'elaboracao de documentos',
+                            'solicitação de documentos', 'solicitacao de documentos'
+                        ]
+                        # Verifica se o assunto_str começa com qualquer um dos assuntos válidos
+                        if any(assunto_str.startswith(a) for a in assuntos_validos_outros):
+                            is_outros_valido = True
+                        
+                        # Garante que "arquivamento" NÃO está no assunto_str se for tipo "outros"
+                        if 'arquivamento' in assunto_str:
+                            is_outros_valido = False # Sobrescreve para FALSE se for arquivamento
 
-
-                    if is_squad_contratacao or is_outros or is_liberacao_fluxo:
+                    # Inclui a linha se atender a qualquer uma das condições
+                    if is_squad_contratacao or is_liberacao_fluxo or is_outros_valido:
                         # O status será padrão 'Pendente' se não existir na planilha ou for vazia
                         # Se a coluna 'Status' existe, usa o valor dela, caso contrário, 'Pendente'
                         status_from_excel = row.get('Status', 'Pendente') if 'Status' in df.columns else 'Pendente'
@@ -1465,10 +1479,10 @@ def monitor_juridico():
         data_criacao = row_obj.data_criacao
         assunto = row_obj.assunto
         proprietario = primeiro_nome(row_obj.proprietario)
-        criado_por = primeiro_nome(row_obj.criado_por) # CORREÇÃO: Definição de criado_por
+        criado_por = primeiro_nome(row_obj.criado_por) 
         prioridade = row_obj.prioridade
         current_status_db = row_obj.status
-        tipo_atividade = row_obj.tipo # CORREÇÃO: Definição de tipo_atividade
+        tipo_atividade = row_obj.tipo 
         areas_pendentes_db = row_obj.areas_pendentes
         
         hoje = datetime.now().date()
@@ -1500,15 +1514,15 @@ def monitor_juridico():
             'data_criacao': data_criacao.strftime('%d/%m/%Y'),
             'assunto': assunto,
             'proprietario': proprietario,
-            'criador': criado_por, # Usar a variável definida
+            'criador': criado_por, 
             'prioridade': prioridade,
             'status': status_display,
             'dias': dias,
             'cor': cor,
-            'tipo': tipo_atividade, # Usar a variável definida
+            'tipo': tipo_atividade, 
             'original_status': current_status_db,
             'areas_pendentes': areas_pendentes_db
-        } ## TEST
+        } 
 
         if 'liberação de fluxo' in assunto.lower():
             atividades_liberacao.append(atividade_dict)
