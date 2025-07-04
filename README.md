@@ -26,7 +26,7 @@ As funcionalidades são projetadas para simplificar e automatizar diversas taref
 * **Exclusão de Clientes:** Filtragem automática de clientes específicos que devem ser excluídos da análise.
 * **Contas em Transição (Beta):** Ferramenta para gerenciar a transição de clientes entre consultores, ajustando a gestão dos pleitos automaticamente com base em uma planilha ou inserção manual.
 * **Exportação de Dados:** Exporta os dados filtrados para um novo arquivo Excel.
-* **Configuração de Atrasos:** A data limite para considerar pleitos atrasados agora é configurável por administradores.
+* [cite_start]**Configuração de Atrasos:** A data limite para considerar pleitos atrasados agora é configurável por administradores. 
 
 ### **3. Cálculo de Multa Contratual**
 * **Cálculo Automatizado:** Ferramenta para calcular multas de rescisão/cancelamento de contratos.
@@ -34,15 +34,17 @@ As funcionalidades são projetadas para simplificar e automatizar diversas taref
 * **Consideração de Aviso Prévio:** Opções configuráveis de aviso prévio para impactar o cálculo da multa.
 * **Opção de Percentual Personalizado:** Permite definir um percentual de multa personalizado, anulando o cálculo automático.
 * **Geração de Código de Controle:** Gera um código de controle único para cada cálculo de multa.
+* **Salvamento Histórico:** Todos os cálculos de multa são salvos no banco de dados para consultas futuras.
+* **Nome do Cliente Obrigatório:** O preenchimento do nome do cliente agora é obrigatório para o cálculo da multa.
 * **Integração com Logs:** Todos os cálculos são registrados no histórico de logs.
 * **Relatório Detalhado:** Geração de uma página de resultados com todos os detalhes do cálculo, pronta para impressão.
 
 ### **4. Dashboard SLA Squad**
-* **Acompanhamento Mensal:** Permite o cadastro mensal de resultados de SLA, incluindo quantidade dentro/fora SLA e total de processos.
+* **Acompanhamento Mensal:** Permite o cadastro mensal de resultados de SLA, incluindo quantidade dentro/fora SLA e total de processos, **com todos os dados persistidos no banco de dados para histórico**.
 * **Visualização de Desempenho:** Exibe o percentual `Realizado` e a `Meta` definida, com um gráfico de barras (Chart.js) para acompanhamento visual.
-* **Gestão de Meta:** Capacidade de definir e ajustar a meta mensal do SLA (entre 70% e 100%).
-* **Importação/Exportação:** Funcionalidades para importar dados de Excel e exportar o dashboard em formato Excel ou PDF.
-* **Fechamento de Ano:** Opção para "fechar o ano" quando todos os 12 meses são preenchidos, calculando a média anual.
+* **Gestão de Meta Centralizada:** A meta mensal do SLA é agora **salva no banco de dados e pode ser definida/ajustada na tela de Configurações do Administrador**.
+* **Importação/Exportação:** Funcionalidades para importar dados de Excel e exportar o dashboard em formato Excel ou PDF, **com formatação aprimorada para valores decimais**.
+* **Fechamento de Ano:** Opção para "fechar o ano" quando todos os 12 meses são preenchidos, calculando a **mediana anual** dos valores realizados.
 
 ### **5. Monitor Jurídico**
 * **Análise de Atividades:** Upload e acompanhamento de planilhas de atividades jurídicas com colunas como `Tipo`, `Assunto`, `Data de Criação`, `Proprietário`, `Criada por` e `Prioridade`.
