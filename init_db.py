@@ -213,14 +213,26 @@ with app.app_context():
     else:
         print("\n5. Feriados já existem no banco de dados. Pulando inserção de padrões.")
 
+# ... (imports no topo do init_db.py) ...
+
     if AtividadeJuridica.query.count() == 0:
         print("\n6. Inserindo atividades jurídicas de exemplo no banco de dados...")
         atividades_exemplo = [
+            # Exemplo de Squad Contratação
             AtividadeJuridica(tipo='Squad Contratação', assunto='ANÁLISE DE CONTRATO - Cliente A', data_criacao=date(2025, 5, 20), proprietario='Vinicius', criado_por='Augusto', prioridade='Normal', status='Pendente'),
-            AtividadeJuridica(tipo='Outros', assunto='SOLICITAÇÃO DE DOCUMENTO - Cliente B', data_criacao=date(2025, 5, 15), proprietario='Maria', criado_por='Augusto', prioridade='Solicitada', status='Pendente'),
             AtividadeJuridica(tipo='Squad Contratação', assunto='LIBERAÇÃO DE FLUXO - Cliente C', data_criacao=date(2025, 5, 25), proprietario='Joseane', criado_por='Larissa', prioridade='Normal', status='Pendente'),
-            AtividadeJuridica(tipo='Squad Contratação', assunto='ANÁLISE DE CONTRATO - Cliente D', data_criacao=date(2025, 5, 10), proprietario='Vinicius', criado_por='Augusto', prioridade='Normal', status='Pendente', areas_pendentes='Produtos,Faturamento'),
-            AtividadeJuridica(tipo='Squad Contratação', assunto='ANÁLISE DE CONTRATO - Cliente E', data_criacao=date(2025, 5, 18), proprietario='Ana', criado_por='Larissa', prioridade='Normal', status='Concluída'),
+            
+            # Exemplos de Outros que DEVEM aparecer (com variações de assunto e nome)
+            AtividadeJuridica(tipo='Outros', assunto='[ANÁLISE DE CONTRATO] - Cliente B', data_criacao=date(2025, 5, 15), proprietario='Maria', criado_por='Augusto Nascimento', prioridade='Solicitada', status='Pendente'),
+            AtividadeJuridica(tipo='Outros', assunto='ID do Contrato 1234 - SOLICITAÇÃO DE DOCUMENTO - Cliente X', data_criacao=date(2025, 5, 22), proprietario='Augusto Nascimento', criado_por='Ana Carolina', prioridade='Normal', status='Pendente'),
+            AtividadeJuridica(tipo='Outros', assunto='ELABORACAO DE DOCUMENTOS para o Projeto Y', data_criacao=date(2025, 5, 18), proprietario='Larissa', criado_por='Vinicius', prioridade='Normal', status='Pendente'),
+            AtividadeJuridica(tipo='Outros', assunto='[SOLICITACAO DE DOCUMENTOS] - Contrato Z', data_criacao=date(2025, 5, 10), proprietario='Larissa', criado_por='Vinicius', prioridade='Normal', status='Pendente'),
+            AtividadeJuridica(tipo='Outros', assunto='ANÁLISE DE CONTRATO Cliente X', data_criacao=date(2025, 5, 26), proprietario='Augusto', criado_por='Augusto Nascimento de Almeida', prioridade='Normal', status='Pendente'), # Adicionado seu exemplo da planilha
+
+            # Exemplos de Outros que NÃO DEVEM aparecer (com "arquivamento" ou assuntos inválidos)
+            AtividadeJuridica(tipo='Outros', assunto='ARQUIVAMENTO DE DOCUMENTOS - Cliente Y', data_criacao=date(2025, 5, 20), proprietario='Augusto', criado_por='Maria', prioridade='Normal', status='Pendente'),
+            AtividadeJuridica(tipo='Outros', assunto='REUNIÃO COM CLIENTE', data_criacao=date(2025, 5, 21), proprietario='Vinicius', criado_por='Augusto', prioridade='Normal', status='Pendente'),
+            AtividadeJuridica(tipo='Outros', assunto='CONFERENCIA DE FATURA', data_criacao=date(2025, 5, 19), proprietario='Larissa', criado_por='Ana Carolina', prioridade='Normal', status='Pendente'),
         ]
         for atividade in atividades_exemplo:
             db.session.add(atividade)

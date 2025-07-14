@@ -36,6 +36,26 @@
                 <i class="bi bi-upload"></i> Importar
             </button>
         </form>
+
+        {# Formulário de filtro por Proprietário (anteriormente Criada por) #}
+        <form method="GET" action="{{ url_for('monitor_juridico') }}" class="d-flex align-items-center mb-4" style="gap:12px;">
+            <label for="filter_proprietario" class="form-label mb-0 me-2"><strong>Filtrar por Proprietário:</strong></label>
+            <select class="form-select form-select-sm" style="width:200px;max-width:200px;display:inline-block;" id="filter_proprietario" name="filter_proprietario">
+                <option value="">Todos</option>
+                {% for proprietario in unique_proprietarios %}
+                    <option value="{{ proprietario }}" {% if filter_proprietario == proprietario %}selected{% endif %}>{{ proprietario }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-outline-primary btn-sm ms-2" type="submit">
+                <i class="bi bi-funnel"></i> Filtrar
+            </button>
+            {% if filter_proprietario %}
+            <a href="{{ url_for('monitor_juridico') }}" class="btn btn-outline-secondary btn-sm ms-2">
+                <i class="bi bi-x-lg"></i> Limpar
+            </a>
+            {% endif %}
+        </form>
+
         <div class="table-responsive">
             <table class="table table-bordered align-middle" id="tabelaAtividades">
                 <thead class="table-light">
@@ -81,7 +101,15 @@
                             </td>
                             <td>{{ a.dias }}</td>
                             <td>
-                                <span class="span-status">{% if a.original_status.lower() == 'concluída' %}Concluída{% elif a.areas_pendentes and a.areas_pendentes != 'null' %}Pendente: {{ a.areas_pendentes.replace(',', ', ') }}{% else %}{{ a.original_status or '' }}{% endif %}</span>
+                                <span class="span-status">
+                                    {% if a.original_status.lower() == 'concluída' %}
+                                        Concluída
+                                    {% elif a.areas_pendentes and a.areas_pendentes != 'null' %}
+                                        Pendente: {{ a.areas_pendentes.replace(',', ', ') }}
+                                    {% else %}
+                                        {{ a.original_status or '' }}
+                                    {% endif %}
+                                </span>
                                 <span class="badges-area ms-1">
                                     {% if a.areas_pendentes and a.areas_pendentes != 'null' %}
                                         {% for area in a.areas_pendentes.split(',') %}
@@ -144,7 +172,15 @@
                             <td><span class="prioridade-label">{{ l.prioridade or 'Normal'}}</span></td>
                             <td>{{ l.dias }}</td>
                             <td>
-                                <span class="span-status">{% if l.original_status.lower() == 'concluída' %}Concluída{% elif l.areas_pendentes and l.areas_pendentes != 'null' %}Pendente: {{ l.areas_pendentes.replace(',', ', ') }}{% else %}{{ l.original_status or '' }}{% endif %}</span>
+                                <span class="span-status">
+                                    {% if l.original_status.lower() == 'concluída' %}
+                                        Concluída
+                                    {% elif l.areas_pendentes and l.areas_pendentes != 'null' %}
+                                        Pendente: {{ l.areas_pendentes.replace(',', ', ') }}
+                                    {% else %}
+                                        {{ l.original_status or '' }}
+                                    {% endif %}
+                                </span>
                                 <span class="badges-area ms-1">
                                     {% if l.areas_pendentes and l.areas_pendentes != 'null' %}
                                         {% for area in l.areas_pendentes.split(',') %}
@@ -280,7 +316,7 @@
     </div>
   </div>
 </div>
-{# Formulário para submeter a textarea. Fica fora do modal mas é acionado pelo botão de salvar #}
+{# Formulário para submeter a textarea. Fica fora do modal but is acionado pelo botão de salvar #}
 <form method="post" id="formFeriadosSubmit" style="display:none;">
     <input type="hidden" name="feriados_raw_input" id="hiddenFeriadosRawInput">
 </form>
@@ -373,8 +409,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     btn.style.display = "none";
                     tr.querySelector('.btn-status').style.display = "";
                     tr.querySelector('.btn-outraarea').style.display = "";
-                    // Para reexibir áreas pendentes (se houver), você precisaria do valor original ou de outra chamada AJAX
-                    // por enquanto, ele apenas volta para o status "Pendente" sem as áreas.
                 } else {
                     showToast(data.message, 'danger');
                 }
@@ -606,7 +640,11 @@ document.addEventListener("DOMContentLoaded", function () {
         toastEl.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
-                    <i class="bi ${category === 'success' ? 'bi-check-circle-fill' : category === 'danger' ? 'bi-exclamation-triangle-fill' : category === 'warning' ? 'bi-exclamation-circle-fill' : 'bi-info-circle-fill'} me-2"></i>
+                    <i class="bi 
+                    {% if category == 'success' %}bi-check-circle-fill
+                    {% elif category == 'danger' %}bi-exclamation-triangle-fill
+                    {% elif category == 'warning' %}bi-exclamation-circle-fill
+                    {% else %}bi-info-circle-fill{% endif %} me-2"></i>
                     ${message}
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>

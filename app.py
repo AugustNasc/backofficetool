@@ -8,6 +8,7 @@ import pandas as pd
 import requests
 import statistics
 import json 
+import unicodedata 
 
 from datetime import datetime, timedelta, date
 from uuid import uuid4
@@ -1251,19 +1252,26 @@ def calcular_multa():
 # from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica
 # from datetime import datetime, timedelta, date
 
+# ... (imports no topo do arquivo app.py) ...
+
+# ... (Imports no topo do app.py, certifique-se de que todos os módulos necessários estão importados) ...
+
+# ... (Imports no topo do app.py) ...
+
+# ... (imports no topo do app.py) ...
+# Adicione a importação para normalização de string (se não tiver):
+import unicodedata 
+
 @app.route('/monitor_juridico', methods=['GET', 'POST'])
-@permission_required('can_access_monitor_juridico') # Acesso ao monitor jurídico
+@permission_required('can_access_monitor_juridico')
 def monitor_juridico():
-    # Carrega todos os feriados do banco de dados
     all_holidays_db = Feriado.query.order_by(Feriado.data).all()
-    feriados_for_calc = {f.data for f in all_holidays_db} # Set de objetos date
-    feriados_str = [f.format_date_br() for f in all_holidays_db] # Lista de strings para textarea
+    feriados_for_calc = {f.data for f in all_holidays_db}
+    feriados_str = [f.format_date_br() for f in all_holidays_db]
 
     erro = None
     
-    # === POST para SALVAR os feriados editados manualmente na textarea ===
     if request.method == 'POST' and 'feriados_raw_input' in request.form:
-        # Lógica já implementada para salvar feriados no DB
         if not session.get('can_edit_monitor_juridico'):
             flash('Você não tem permissão para editar os feriados.', 'danger')
             return redirect(url_for('monitor_juridico'))
@@ -1274,7 +1282,6 @@ def monitor_juridico():
         errors_parsing = []
 
         try:
-            # Limpa todos os feriados existentes no DB
             db.session.query(Feriado).delete()
             db.session.commit()
             logger.info("Todos os feriados existentes foram removidos para atualização.")
@@ -1291,7 +1298,6 @@ def monitor_juridico():
                     try:
                         f_date = datetime.strptime(f_str, "%d/%m/%Y").date()
                         if f_date not in parsed_dates:
-                            # Localidade e tipo serão 'Manual' para feriados adicionados via textarea
                             feriados_para_salvar.append(Feriado(data=f_date, nome="Feriado Manual", localidade="Manual", tipo="Manual"))
                             parsed_dates.add(f_date)
                     except ValueError:
@@ -1322,14 +1328,11 @@ def monitor_juridico():
             flash(f"Erro ao salvar os novos feriados: {e}", "danger")
             logger.error(f"Erro ao salvar os novos feriados: {e}")
 
-        # Recarrega os feriados do DB para garantir que a lista exibida está atualizada
         all_holidays_db = Feriado.query.order_by(Feriado.data).all()
         feriados_for_calc = {f.data for f in all_holidays_db}
         feriados_str = [f.format_date_br() for f in all_holidays_db]
 
-    # === UPLOAD DE PLANILHA PARA ATIVIDADES JURÍDICAS ===
     elif request.method == 'POST' and 'file' in request.files and request.files['file'] and request.files['file'].filename:
-        # Verifica permissão para upload
         if not session.get('can_upload_all'):
             flash('Você não tem permissão para carregar planilhas no Monitor Jurídico.', 'danger')
             return redirect(url_for('monitor_juridico'))
@@ -1338,7 +1341,6 @@ def monitor_juridico():
         try:
             df = pd.read_excel(file)
 
-            # Alterado: 'Status' não é mais obrigatória
             required_columns_juridico = [
                 'Tipo', 'Assunto', 'Data de Criação', 'Proprietário', 'Criada por', 'Prioridade'
             ]
@@ -1365,7 +1367,6 @@ def monitor_juridico():
                 db.session.commit()
                 return redirect(url_for('monitor_juridico'))
 
-            # LIMPA AS ATIVIDADES EXISTENTES NO BANCO ANTES DE INSERIR AS NOVAS DA PLANILHA
             try:
                 db.session.query(AtividadeJuridica).delete()
                 db.session.commit()
@@ -1376,59 +1377,65 @@ def monitor_juridico():
                 logger.error(f"Erro ao limpar atividades jurídicas antigas: {e}")
                 return redirect(url_for('monitor_juridico'))
 
-            # Processa e salva as novas atividades
+            # Função auxiliar para normalizar string (remover acentos, etc.)
+            def normalize_string(s):
+                if not isinstance(s, str):
+                    return ""
+                s = s.lower().strip()
+                s = ''.join(c for c in s if c.isalnum() or c.isspace()) # Remove caracteres especiais
+                s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('utf-8')
+                return s
+
             atividades_salvas_count = 0
             for index, row in df.iterrows():
                 try:
                     data_criacao_excel = pd.to_datetime(row['Data de Criação'], dayfirst=True, errors='coerce').date()
                     if pd.isna(data_criacao_excel):
                         logger.warning(f"Linha {index+2} da planilha ignorada: Data de Criação inválida.")
-                        continue # Pula linhas com data inválida
+                        continue
 
-                    # Normaliza e filtra as linhas com o tipo 'Squad Contratação' OU 'Outros' (com filtro de assunto) OU 'LIBERAÇÃO DE FLUXO' (Assunto)
                     tipo_str = str(row.get('Tipo', '')).strip().lower()
-                    assunto_str = str(row.get('Assunto', '')).strip().lower()
+                    assunto_original = str(row.get('Assunto', '')).strip() # Manter original para salvar
+                    assunto_normalizado = normalize_string(assunto_original) # Usar a nova função de normalização
 
-                    # Condições para incluir a atividade:
                     is_squad_contratacao = tipo_str == 'squad contratação'
-                    is_liberacao_fluxo = 'liberação de fluxo' in assunto_str
+                    is_liberacao_fluxo = 'liberacao de fluxo' in assunto_normalizado # Usar assunto normalizado
                     
                     is_outros_valido = False
                     if tipo_str == 'outros':
-                        assuntos_validos_outros = [
-                            'análise de contrato', 'analise de contrato', 
-                            'elaboração de documentos', 'elaboracao de documentos',
-                            'solicitação de documentos', 'solicitacao de documentos'
+                        # Lista de assuntos válidos para o tipo "Outros" (já normalizados para comparação)
+                        assuntos_validos_outros_norm = [
+                            'analise de contrato', 
+                            'elaboracao de documentos',
+                            'solicitacao de documento', 
+                            'solicitacao de documentos'
                         ]
-                        # Verifica se o assunto_str começa com qualquer um dos assuntos válidos
-                        if any(assunto_str.startswith(a) for a in assuntos_validos_outros):
+                        
+                        # Verifica se o assunto_normalizado CONTÉM qualquer um dos termos válidos
+                        if any(term in assunto_normalizado for term in assuntos_validos_outros_norm):
                             is_outros_valido = True
                         
-                        # Garante que "arquivamento" NÃO está no assunto_str se for tipo "outros"
-                        if 'arquivamento' in assunto_str:
-                            is_outros_valido = False # Sobrescreve para FALSE se for arquivamento
+                        # Exclusão: Garante que "arquivamento" ou "arquivo" NÃO está no assunto_normalizado
+                        if 'arquivamento' in assunto_normalizado or 'arquivo' in assunto_normalizado:
+                            is_outros_valido = False 
 
-                    # Inclui a linha se atender a qualquer uma das condições
                     if is_squad_contratacao or is_liberacao_fluxo or is_outros_valido:
-                        # O status será padrão 'Pendente' se não existir na planilha ou for vazia
-                        # Se a coluna 'Status' existe, usa o valor dela, caso contrário, 'Pendente'
                         status_from_excel = row.get('Status', 'Pendente') if 'Status' in df.columns else 'Pendente'
 
                         nova_atividade = AtividadeJuridica(
                             tipo=row.get('Tipo'),
-                            assunto=row.get('Assunto'),
+                            assunto=assunto_original, # Salvar o assunto original
                             data_criacao=data_criacao_excel,
                             proprietario=row.get('Proprietário'),
                             criado_por=row.get('Criada por'),
-                            prioridade=row.get('Prioridade', 'Normal'), # Padrão 'Normal' se não houver
-                            status=status_from_excel # Usa o status da planilha ou 'Pendente'
+                            prioridade=row.get('Prioridade', 'Normal'),
+                            status=status_from_excel
                         )
                         db.session.add(nova_atividade)
                         atividades_salvas_count += 1
 
                 except Exception as e:
                     logger.error(f"Erro ao processar linha {index+2} da planilha de atividades: {e}")
-                    # Continua processando as outras linhas mesmo com erro em uma
 
             db.session.commit()
             flash(f'Planilha de Monitor Jurídico carregada e {atividades_salvas_count} atividades salvas no banco de dados!', 'success')
@@ -1465,20 +1472,32 @@ def monitor_juridico():
             return redirect(url_for('monitor_juridico'))
 
     # === GET normal ou atualização de página (CARREGAR DO BANCO DE DADOS) ===
-    # Agora, carregamos as atividades e liberações DIRETAMENTE DO BANCO
-    all_activities_from_db = AtividadeJuridica.query.all()
+    filter_proprietario = request.args.get('filter_proprietario', '').strip()
+
+    def primeiro_nome(nome_completo):
+        return str(nome_completo).strip().split(' ')[0] if nome_completo and str(nome_completo).strip() else ""
+
+    query_atividades = AtividadeJuridica.query
+
+    if filter_proprietario:
+        query_atividades = query_atividades.filter(
+            db.or_(
+                # Tenta casar o primeiro nome (até o primeiro espaço)
+                db.func.lower(db.func.substr(AtividadeJuridica.proprietario, 1, db.func.instr(AtividadeJuridica.proprietario, ' ') - 1)) == db.func.lower(filter_proprietario),
+                # Tenta casar o nome completo se for um nome simples ou o primeiro nome não casar
+                db.func.lower(AtividadeJuridica.proprietario) == db.func.lower(filter_proprietario)
+            )
+        )
+    
+    all_activities_from_db = query_atividades.all()
     
     atividades_geral = []
     atividades_liberacao = []
 
-    def primeiro_nome(nome):
-        return str(nome).split()[0] if nome else ""
-
     for row_obj in all_activities_from_db:
-        # Define todas as variáveis necessárias a partir de row_obj
         data_criacao = row_obj.data_criacao
         assunto = row_obj.assunto
-        proprietario = primeiro_nome(row_obj.proprietario)
+        proprietario = primeiro_nome(row_obj.proprietario) 
         criado_por = primeiro_nome(row_obj.criado_por) 
         prioridade = row_obj.prioridade
         current_status_db = row_obj.status
@@ -1513,7 +1532,7 @@ def monitor_juridico():
             'id': row_obj.id,
             'data_criacao': data_criacao.strftime('%d/%m/%Y'),
             'assunto': assunto,
-            'proprietario': proprietario,
+            'proprietario': proprietario, 
             'criador': criado_por, 
             'prioridade': prioridade,
             'status': status_display,
@@ -1529,10 +1548,14 @@ def monitor_juridico():
         else:
             atividades_geral.append(atividade_dict)
             
-    # Ordena atividades gerais e liberações pela data de criação
     atividades_geral = sorted(atividades_geral, key=lambda x: datetime.strptime(x['data_criacao'], "%d/%m/%Y"), reverse=False)
     atividades_liberacao = sorted(atividades_liberacao, key=lambda x: datetime.strptime(x['data_criacao'], "%d/%m/%Y"), reverse=False)
 
+    unique_proprietarios = db.session.query(
+        AtividadeJuridica.proprietario
+    ).filter(AtividadeJuridica.proprietario != None).distinct().order_by(AtividadeJuridica.proprietario).all()
+    
+    unique_proprietarios_list = sorted(list(set(primeiro_nome(p[0]) for p in unique_proprietarios if p[0])))
 
     return render_template(
         'monitor_juridico.html',
@@ -1540,7 +1563,9 @@ def monitor_juridico():
         liberacoes=atividades_liberacao,
         feriados=feriados_str,
         erro=erro,
-        now=datetime.now()
+        now=datetime.now(),
+        unique_proprietarios=unique_proprietarios_list,
+        filter_proprietario=filter_proprietario
     )
 
 # Rota para buscar feriados em JSON para o modal (para recarregar a textarea)
