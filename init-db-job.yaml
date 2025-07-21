@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Nome do Job. Deve ser único dentro do namespace.
+  # Pode adicionar um sufixo de data ou hash para garantir unicidade em re-execuções.
+  name: backoffice-init-db-job
+spec:
+  # Configurações do pod que o Job irá criar.
+  template:
+    spec:
+      containers:
+      - name: init-db-container
+        # IMPORTANTE: Substitua 'seu_registry/backoffice-tools:latest'
+        # pela URL COMPLETA da imagem Docker da sua aplicação
+        # (aquela que você construiu a partir do Dockerfile).
+        image: seu_registry/backoffice-tools:latest
+        
+        # O comando que será executado dentro do container para inicializar o DB.
+        # "/bin/sh -c" permite executar múltiplos comandos ou comandos complexos.
+        command: ["/bin/sh", "-c"]
+        args:
+          - [cite_start]"cd /app && poetry run python init_db.py" # 
+            # O 'cd /app' garante que o script seja executado do diretório correto.
+            # 'poetry run python init_db.py' executa seu script de inicialização.
+            # Este script irá criar as tabelas e popular os dados iniciais. 
+        
+        # Define onde o Volume Persistente será montado dentro do container.
+        # Isso é CRÍTICO para que o banco de dados SQLite seja salvo em um local persistente.
+        volumeMounts:
+        - name: backoffice-db-storage # Deve corresponder ao nome do volume abaixo.
+          mountPath: /app/instance   # Onde o 'backoffice.db' é salvo pela sua aplicação.
+      
+      # Define o Volume que será usado, referenciando um Persistent Volume Claim (PVC) existente.
+      volumes:
+      - name: backoffice-db-storage # Nome do volume que será montado.
+        persistentVolumeClaim:
+          # IMPORTANTE: Substitua 'backoffice-pvc' pelo NOME REAL
+          # do Persistent Volume Claim (PVC) criado pela equipe de infraestrutura.
+          claimName: backoffice-pvc
+          
+      # Política de reinício para o pod do Job:
+      # OnFailure: O pod será reiniciado se o comando falhar (útil para tentar novamente).
+      # Never: O pod não será reiniciado em caso de falha (padrão para Jobs, mas OnFailure é mais robusto aqui).
+      restartPolicy: OnFailure 
+  
+  # Configurações específicas do Job:
+  # completions: 1 - O Job será considerado bem-sucedido após uma única execução completa do pod.
+  completions: 1
+  # backoffLimit: 4 - O Job tentará executar o pod no máximo 4 vezes antes de ser considerado falho.
+  backoffLimit: 4
+  # activeDeadlineSeconds: 300 - O Job falhará se não for concluído em 300 segundos (5 minutos).
+  activeDeadlineSeconds: 300

@@ -1,0 +1,28 @@
+FROM python:3.13-slim-bookworm
+
+# Define o diretório de trabalho dentro do container
+WORKDIR /app
+
+# Instala o Poetry
+RUN pip install poetry==1.8.2
+
+# Copia os arquivos de configuração do Poetry e de dependências para o cache do Docker.
+COPY pyproject.toml poetry.lock ./ 
+
+# Instala as dependências do projeto usando Poetry.
+RUN poetry install --no-root --no-dev
+
+# Copia o restante do código da aplicação para o container
+COPY . . 
+
+# PORTA
+EXPOSE 10000 
+
+# Definir a variável de ambiente para o Flask
+ENV FLASK_APP=app.py 
+
+# Comando de inicialização.
+# INICIA A APLICAÇÃO FLASK USANDO GUNICORN.
+# O init_db.py deve ser rodado SEPARADAMENTE (via Kubernetes Job) UMA ÚNICA VEZ
+# na primeira implantação para evitar a perda de dados.
+CMD ["poetry run gunicorn -w 4 -b 0.0.0.0:10000 --timeout 120 'app:app'"]

@@ -7,66 +7,41 @@ import logging
 import pandas as pd
 import requests
 import statistics
-import json 
-import unicodedata 
-
-from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal, CorrecaoMonetariaHistorico, CnpjConsultaHistorico # Adicionar CnpjConsultaHistorico aqui
-
+import unicodedata
+import pytz
 
 from datetime import datetime, timedelta, date
 from uuid import uuid4
 from io import BytesIO
 from functools import wraps
-
-from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal
-
-from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal, CorrecaoMonetariaHistorico # Adicionar CorrecaoMonetariaHistorico aqui
-
-# ...
-
-# Na seção de imports de Utils do projeto:
-from utils.pdf_generator import preparar_base_pdf, exportar_sla_pdf
-from utils.excel_export import preparar_base_excel, exportar_sla_excel, exportar_logs_excel
-from utils.file_processing import (
-    process_hotlines,
-    analyze_pleitos, filtrar_clientes_excluidos, safe_float
-)
-from utils.dias_uteis import dias_uteis_entre_datas
-from utils.value_correction import corrigir_valor, normalizar_data # ADICIONAR normalizar_data AQUI
-from utils.auth import authenticate_user
-
+from dateutil.relativedelta import relativedelta
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session, flash,
     send_from_directory, abort, make_response, send_file, current_app, jsonify
 )
-from flask_wtf import FlaskForm
+from flask_wtf import FlaskForm 
 from wtforms import StringField, validators
 
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename 
 
-# modelos e config
-from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica
+from models import (
+    db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica,
+    Cancelamento, SlaMensal, CorrecaoMonetariaHistorico, CnpjConsultaHistorico
+)
 from config import Config
 
-# Bibliotecas de terceiros
-from fpdf import FPDF
-from dateutil.relativedelta import relativedelta
-import xlsxwriter
-
-# Utils do projeto
 from utils.pdf_generator import preparar_base_pdf, exportar_sla_pdf
 from utils.excel_export import preparar_base_excel, exportar_sla_excel, exportar_logs_excel
 from utils.file_processing import (
-    process_hotlines,
-    analyze_pleitos, filtrar_clientes_excluidos, safe_float
+    process_hotlines, analyze_pleitos, filtrar_clientes_excluidos, safe_float
 )
 from utils.dias_uteis import dias_uteis_entre_datas
-from utils.value_correction import corrigir_valor
+from utils.value_correction import corrigir_valor, normalizar_data
 from utils.auth import authenticate_user
 
-
-from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento # Adicionar Cancelamento aqui
+from fpdf import FPDF
+import xlsxwriter
 
 # ===== FIM DOS IMPORTS =====
 
@@ -2785,8 +2760,6 @@ def alterar_senha():
 
 # ============= INICIALIZAÇÃO =============
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        print("A aplicação está inicializando. Garanta que 'python init_db.py' foi executado para configurar o banco de dados e usuários.")
+    print("A aplicação está inicializando. Garanta que 'python init_db.py' foi executado para configurar o banco de dados e usuários.")
 
-    app.run(host='0.0.0.0', port=10000, debug=True)
+    app.run(host='0.0.0.0', port=10000, debug=False)
