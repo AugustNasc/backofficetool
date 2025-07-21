@@ -15,9 +15,9 @@
         </h2>
     </div>
     <div class="card-body">
-        <form method="post" id="correcaoForm">
+        <form method="post" id="correcaoForm" enctype="multipart/form-data"> {# ADICIONADO enctype #}
             <div class="row mb-3">
-                <div class="col">
+                <div class="col-md-4"> {# Ajustado para ocupar 4 colunas #}
                     <label>Índice:</label>
                     <select name="indice" class="form-select">
                         {% for i in indices %}
@@ -25,123 +25,396 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col">
+                <div class="col-md-4"> {# Ajustado para ocupar 4 colunas #}
                     <label>Data Final <span class="text-muted">(DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA)</span>:</label>
                     <input type="text" name="data_final" class="form-control" required value="{{ hoje }}" placeholder="Ex: 05/2023 ou 31/05/2023">
                 </div>
+                <div class="col-md-4"> {# NOVO CAMPO: Nome do Cliente #}
+                    <label>Nome do Cliente (Opcional):</label>
+                    <input type="text" name="nome_cliente" class="form-control" placeholder="Ex: Cliente Alpha">
+                </div>
             </div>
+
             <div id="valores-dinamicos">
+                {# Linha de entrada inicial #}
                 <div class="row mb-2">
-                    <div class="col">
+                    <div class="col-md-5"> {# Ajustado para 5 colunas #}
                         <label>Data Inicial <span class="text-muted">(DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA)</span>:</label>
                         <input type="text" name="data_inicial[]" class="form-control" required placeholder="Ex: 05/2023 ou 01/05/2023">
                         <small class="text-muted">Você pode digitar apenas o mês/ano se preferir (MM/AAAA)</small>
                     </div>
-                    <div class="col">
+                    <div class="col-md-5"> {# Ajustado para 5 colunas #}
                         <label>Valor:</label>
                         <input type="number" step="0.01" name="valor[]" class="form-control" placeholder="Valor" required>
                     </div>
+                    <div class="col-md-2 d-flex align-items-end"> {# Novo botão de remover #}
+                        <button type="button" class="btn btn-danger btn-sm w-100" onclick="removeLinha(this)">Remover</button>
+                    </div>
                 </div>
             </div>
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addLinha()">Adicionar novo valor</button>
-            <button type="submit" class="btn btn-primary">Calcular</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="addLinha()">Adicionar novo valor</button>
+            
+            {# Seção para Upload de Planilha #}
+            <h5 class="mt-4 mb-3">Ou Calcular a partir de Planilha</h5>
+            <div class="row mb-3 align-items-end">
+                <div class="col-md-8">
+                    <label for="file_correcao" class="form-label">Arquivo Excel (Colunas "Data Inicial", "Valor"):</label>
+                    <input type="file" name="file_correcao" id="file_correcao" class="form-control" accept=".xls,.xlsx">
+                </div>
+                <div class="col-md-4 d-grid">
+                    <button type="submit" class="btn btn-success" name="acao" value="upload_planilha">Calcular da Planilha</button>
+                </div>
+            </div>
+
+            <hr>
+            <button type="submit" class="btn btn-primary" name="acao" value="calcular_manual">
+                <i class="bi bi-calculator"></i> Calcular Manualmente
+            </button>
         </form>
 
         {% if resultado %}
         <hr>
-        <h5>Resultados:</h5>
-        <table class="table">
-            <thead>
+        <h5>Resultados do Último Cálculo:</h5>
+        {% if nome_cliente_resultado %} {# Exibir nome do cliente se houver #}
+        <p class="mb-2"><strong>Cliente:</strong> {{ nome_cliente_resultado }}</p>
+        {% endif %}
+        <table class="table table-striped table-bordered mt-2">
+            <thead class="table-light">
                 <tr>
                     <th>Data Inicial</th>
                     <th>Valor Original</th>
                     <th>Valor Corrigido</th>
-                    <th></th>
+                    <th>Índice Utilizado</th>
+                    <th>% Acumulado</th>
+                    <th>Detalhes</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in resultado %}
-                <tr>
+                <tr class="{{ 'table-danger' if r.erro else '' }}">
                     <td>{{ r.data_inicial }}</td>
                     <td>{{ r.valor_original|moeda_br }}</td>
-                    <td>{{ r.valor_corrigido|moeda_br }}</td>
+                    <td>{{ r.valor_corrigido|moeda_br if not r.erro else 'Erro' }}</td>
+                    <td>{{ r.indice_utilizado }}</td>
+                    <td>{{ r.percentual_acumulado|br_decimal(4) if r.percentual_acumulado is not none else "-" }} %</td>
                     <td>
-                        <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#detalheModal{{ r.id }}">
-                            Ver detalhes
-                        </button>
-                        <!-- Modal Detalhes -->
-                        <div class="modal fade" id="detalheModal{{ r.id }}" tabindex="-1" aria-labelledby="detalheModalLabel{{ r.id }}" aria-hidden="true">
-                          <div class="modal-dialog">
-                            <div class="modal-content">
-                              <div class="modal-header">
-                                <h5 class="modal-title" id="detalheModalLabel{{ r.id }}">Detalhes da Correção</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                              </div>
-                              <div class="modal-body">
-                                <div class="alert alert-secondary mb-2" style="font-size: 0.98rem;">
-                                    <strong>Dados calculados</strong>
-                                    <hr class="my-2">
-                                    <div class="row mb-1">
-                                        <div class="col-7 text-end pe-2">
-                                            Índice de correção no período
+                        {% if r.erro %}
+                            <span class="text-danger">{{ r.erro }}</span>
+                        {% else %}
+                            <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#detalheModal{{ r.id }}">
+                                Ver detalhes
+                            </button>
+                            <div class="modal fade" id="detalheModal{{ r.id }}" tabindex="-1" aria-labelledby="detalheModalLabel{{ r.id }}" aria-hidden="true">
+                              <div class="modal-dialog">
+                                <div class="modal-content">
+                                  <div class="modal-header">
+                                    <h5 class="modal-title" id="detalheModalLabel{{ r.id }}">Detalhes da Correção</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                  </div>
+                                  <div class="modal-body">
+                                    <div class="alert alert-secondary mb-2" style="font-size: 0.98rem;">
+                                        <strong>Dados calculados</strong>
+                                        <hr class="my-2">
+                                        <div class="row mb-1">
+                                            <div class="col-7 text-end pe-2">
+                                                Índice de correção no período
+                                            </div>
+                                            <div class="col-5 fw-bold ps-1">
+                                                {{ r.fator_acumulado|br_decimal(8) if r.fator_acumulado is not none else "-" }}
+                                            </div>
                                         </div>
-                                        <div class="col-5 fw-bold ps-1">
-                                            {{ r.fator_acumulado|br_decimal(8) if r.fator_acumulado is not none else "-" }}
+                                        <div class="row mb-1">
+                                            <div class="col-7 text-end pe-2">
+                                                Valor percentual correspondente
+                                            </div>
+                                            <div class="col-5 fw-bold ps-1">
+                                                {{ r.percentual_acumulado|br_decimal(6) if r.percentual_acumulado is not none else "-" }} %
+                                            </div>
+                                        </div>
+                                        <div class="row mb-1">
+                                            <div class="col-7 text-end pe-2">
+                                                Valor corrigido na data final
+                                            </div>
+                                            <div class="col-5 fw-bold ps-1">
+                                                {{ r.valor_corrigido|moeda_br }}
+                                            </div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-12 text-end text-muted" style="font-size:0.93em;">
+                                                ({{ r.indice_utilizado }})
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="row mb-1">
-                                        <div class="col-7 text-end pe-2">
-                                            Valor percentual correspondente
-                                        </div>
-                                        <div class="col-5 fw-bold ps-1">
-                                            {{ r.percentual_acumulado|br_decimal(6) if r.percentual_acumulado is not none else "-" }} %
-                                        </div>
-                                    </div>
-                                    <div class="row mb-1">
-                                        <div class="col-7 text-end pe-2">
-                                            Valor corrigido na data final
-                                        </div>
-                                        <div class="col-5 fw-bold ps-1">
-                                            {{ r.valor_corrigido|moeda_br }}
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-12 text-end text-muted" style="font-size:0.93em;">
-                                            ({{ r.indice_utilizado }})
-                                        </div>
-                                    </div>
+                                  </div>
+                                  <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                  </div>
                                 </div>
                               </div>
-                              <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                              </div>
                             </div>
-                          </div>
-                        </div>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
         {% endif %}
+
+        <hr class="mt-4 mb-4">
+        {# NOVO: Seção de Histórico de Cálculos #}
+        <h5 class="mb-3">Histórico de Cálculos de Correção (Últimos 10)</h5>
+        {% if historico_calculos %}
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Data Cálculo</th>
+                        <th>Origem</th>
+                        <th>Data Inicial</th>
+                        <th>Data Final</th>
+                        <th>Valor Original</th>
+                        <th>Valor Corrigido</th>
+                        <th>Índice</th>
+                        <th>% Acumulado</th>
+                        <th>Usuário</th>
+                        <th>Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in historico_calculos %}
+                    <tr class="{{ 'table-danger' if h.erro else '' }}">
+                        <td>{{ h.nome_cliente }}</td>
+                        <td>{{ h.data_calculo }}</td>
+                        <td>{{ h.origem_calculo }}</td>
+                        <td>{{ h.data_inicial }}</td>
+                        <td>{{ h.data_final }}</td>
+                        <td>{{ h.valor_original|moeda_br }}</td>
+                        <td>{{ h.valor_corrigido|moeda_br }}</td>
+                        <td>{{ h.indice_utilizado }}</td>
+                        <td>{{ h.percentual_acumulado|br_decimal(4) }} %</td>
+                        <td>{{ h.user.username if h.user else 'N/A' }}</td> {# Acessa o username do objeto User #}
+                        <td>
+                            {% if h.erro %}
+                                <span class="text-danger">{{ h.erro }}</span>
+                            {% else %}
+                                <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#historicoDetalheModal{{ h.id }}">
+                                    Ver detalhes
+                                </button>
+                                <div class="modal fade" id="historicoDetalheModal{{ h.id }}" tabindex="-1" aria-labelledby="historicoDetalheModalLabel{{ h.id }}" aria-hidden="true">
+                                  <div class="modal-dialog">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <h5 class="modal-title" id="historicoDetalheModalLabel{{ h.id }}">Detalhes do Cálculo (Histórico)</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                      </div>
+                                      <div class="modal-body">
+                                        <div class="alert alert-secondary mb-2" style="font-size: 0.98rem;">
+                                            <strong>Dados do Cálculo</strong>
+                                            <hr class="my-2">
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Data do Cálculo
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.data_calculo }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Cliente
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.nome_cliente }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Origem do Cálculo
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.origem_calculo }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Data Inicial
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.data_inicial }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Data Final
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.data_final }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Valor Original
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.valor_original|moeda_br }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Índice de correção no período
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.fator_acumulado|br_decimal(8) }}
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Valor percentual correspondente
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.percentual_acumulado|br_decimal(6) }} %
+                                                </div>
+                                            </div>
+                                            <div class="row mb-1">
+                                                <div class="col-7 text-end pe-2">
+                                                    Valor corrigido na data final
+                                                </div>
+                                                <div class="col-5 fw-bold ps-1">
+                                                    {{ h.valor_corrigido|moeda_br }}
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12 text-end text-muted" style="font-size:0.93em;">
+                                                    ({{ h.indice_utilizado }})
+                                                </div>
+                                            </div>
+                                            {% if h.erro %}
+                                            <div class="row mt-2">
+                                                <div class="col-12">
+                                                    <div class="alert alert-danger p-2" style="font-size:0.9em;">
+                                                        <strong>Erro:</strong> {{ h.erro }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                      </div>
+                                      <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            Nenhum cálculo de correção monetária no histórico ainda.
+        </div>
+        {% endif %}
+
+
+        {# Seção para as Cotações dos Índices (mantém as mesmas, mas agora com AJAX para pegar o histórico) #}
+        <hr class="mt-4 mb-4">
+        <h5 class="mb-3">Cotações de Índices (BrasilAPI)</h5>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card card-body bg-light">
+                    <h6 class="card-title">IPCA <small class="text-muted">(Último disponível)</small></h6>
+                    <p class="card-text fs-4 text-primary" id="ipca_current">Carregando...</p>
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#modalIpcaHistorico">
+                        Ver Histórico IPCA
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card card-body bg-light">
+                    <h6 class="card-title">IGP-M <small class="text-muted">(Último disponível)</small></h6>
+                    <p class="card-text fs-4 text-primary" id="igpm_current">Carregando...</p>
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#modalIgpmHistorico">
+                        Ver Histórico IGP-M
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+{# Modais para Histórico de Índices #}
+<div class="modal fade" id="modalIpcaHistorico" tabindex="-1" aria-labelledby="modalIpcaHistoricoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalIpcaHistoricoLabel">Histórico IPCA</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered table-sm">
+            <thead>
+                <tr><th>Mês/Ano</th><th>Valor (%)</th></tr>
+            </thead>
+            <tbody id="ipca_history_table">
+                <tr><td colspan="2" class="text-center">Carregando histórico...</td></tr>
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalIgpmHistorico" tabindex="-1" aria-labelledby="modalIgpmHistoricoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalIgpmHistoricoLabel">Histórico IGP-M</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered table-sm">
+            <thead>
+                <tr><th>Mês/Ano</th><th>Valor (%)</th></tr>
+            </thead>
+            <tbody id="igpm_history_table">
+                <tr><td colspan="2" class="text-center">Carregando histórico...</td></tr>
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
 function addLinha() {
+    let container = document.getElementById('valores-dinamicos');
     let novo = document.createElement('div');
     novo.className = "row mb-2";
     novo.innerHTML = `
-        <div class="col">
+        <div class="col-md-5">
             <label>Data Inicial <span class="text-muted">(DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA)</span>:</label>
             <input type="text" name="data_inicial[]" class="form-control" required placeholder="Ex: 05/2023 ou 01/05/2023">
             <small class="text-muted">Você pode digitar apenas o mês/ano se preferir (MM/AAAA)</small>
         </div>
-        <div class="col">
+        <div class="col-md-5">
             <label>Valor:</label>
             <input type="number" step="0.01" name="valor[]" class="form-control" placeholder="Valor" required>
         </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="button" class="btn btn-danger btn-sm w-100" onclick="removeLinha(this)">Remover</button>
+        </div>
     `;
-    document.getElementById('valores-dinamicos').appendChild(novo);
+    container.appendChild(novo);
+}
+
+function removeLinha(button) {
+    let row = button.closest('.row');
+    row.remove();
 }
 
 // Ativa tooltips do Bootstrap
@@ -150,6 +423,44 @@ document.addEventListener('DOMContentLoaded', function() {
     tooltipTriggerList.forEach(function (tooltipTriggerEl) {
         new bootstrap.Tooltip(tooltipTriggerEl);
     });
+
+    // Funções para buscar e exibir cotações dos índices
+    function fetchAndDisplayIndex(indexType, currentId, historyTableId, modalId) {
+        fetch(`/correcao-valores/api/cotacoes?indice=${indexType}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.quotes.length > 0) {
+                    const latest = data.quotes[data.quotes.length - 1]; // Último mês
+                    document.getElementById(currentId).textContent = `${parseFloat(latest.valor).toFixed(2)}% (${latest.data_formatada})`;
+
+                    const historyTableBody = document.getElementById(historyTableId);
+                    historyTableBody.innerHTML = '';
+                    // Mostra os 12 últimos meses por padrão
+                    const displayQuotes = data.quotes.slice(-12).reverse(); 
+
+                    if (displayQuotes.length > 0) {
+                        displayQuotes.forEach(q => { 
+                            const row = `<tr><td>${q.data_formatada}</td><td>${parseFloat(q.valor).toFixed(2)}%</td></tr>`;
+                            historyTableBody.innerHTML += row;
+                        });
+                    } else {
+                        historyTableBody.innerHTML = '<tr><td colspan="2" class="text-center">Dados não disponíveis para este período.</td></tr>';
+                    }
+                } else {
+                    document.getElementById(currentId).textContent = 'N/A';
+                    document.getElementById(historyTableId).innerHTML = '<tr><td colspan="2" class="text-center">Dados não disponíveis.</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error(`Erro ao buscar ${indexType}:`, error);
+                document.getElementById(currentId).textContent = 'Erro ao carregar.';
+                document.getElementById(historyTableId).innerHTML = '<tr><td colspan="2" class="text-center">Erro ao carregar dados.</td></tr>';
+            });
+    }
+
+    // Carregar cotações ao carregar a página
+    fetchAndDisplayIndex('IPCA', 'ipca_current', 'ipca_history_table', 'modalIpcaHistorico');
+    fetchAndDisplayIndex('IGPM', 'igpm_current', 'igpm_history_table', 'modalIgpmHistorico');
 });
 </script>
 {% endblock %}

@@ -51,7 +51,6 @@
                                     <i class="bi bi-key"></i>
                                 </button>
                             </form>
-                            {# AÇÃO DE EXCLUIR - AGORA COM MODAL CUSTOMIZADO #}
                             <button type="button" class="btn btn-danger btn-sm" title="Excluir Usuário"
                                 data-bs-toggle="modal" data-bs-target="#confirmDeleteModal"
                                 data-user-id="{{ user_item.id }}"
@@ -67,13 +66,12 @@
     </div>
 </div>
 
-{# NOVO MODAL DE CONFIRMAÇÃO PARA EXCLUSÃO #}
 <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header bg-danger text-white">
         <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Exclusão</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         Tem certeza que deseja excluir o usuário <strong id="usernameToDelete"></strong>?
@@ -98,13 +96,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     var confirmDeleteModal = document.getElementById('confirmDeleteModal');
     confirmDeleteModal.addEventListener('show.bs.modal', function (event) {
-        // Botão que acionou o modal
         var button = event.relatedTarget;
-        // Extrai as informações dos atributos data-*
         var userId = button.getAttribute('data-user-id');
         var username = button.getAttribute('data-username');
 
-        // Atualiza o conteúdo do modal
         var modalTitle = confirmDeleteModal.querySelector('#usernameToDelete');
         var modalUserIdInput = confirmDeleteModal.querySelector('#modalUserId');
         

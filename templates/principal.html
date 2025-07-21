@@ -114,7 +114,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="pleitosModalLabel">Pleitos do Consultor</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="modalPleitosBody">
         </div>
@@ -181,7 +181,6 @@
 </form>
 
 {% if data %}
-{# NOVO: Mensagem de status da base #}
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i>
     Exibindo {{ data_length }} registro(s). Base carregada em: **{{ ultima_carga_dt.strftime('%d/%m/%Y %H:%M') }}**.
@@ -282,7 +281,6 @@ function mostrarPleitos(card) {
     modal.show();
 }
 
-// Script para adicionar/remover linhas de contas em transição
 function addTransicaoRow(cliente='', venda='', gestao='') {
     var tbody = document.getElementById('transicaoTbody');
     var tr = document.createElement('tr');
@@ -329,7 +327,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
     {% endif %}
 
-    // Ao submeter contas em transição, junta linhas manuais para enviar ao back-end
     var formTransicao = document.querySelector('#contasTransicaoModal form');
     if (formTransicao) {
         formTransicao.addEventListener('submit', function(e) {

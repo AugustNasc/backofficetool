@@ -1,11 +1,11 @@
-/* Bootstrap e base */
+/* Estilos globais e Bootstrap */
 
 body {
     background-color: #f6f8fa;
     font-family: 'Segoe UI', Arial, sans-serif;
 }
 
-/* Estilo das cards, tabelas e botões */
+/* Cards, tabelas e botões */
 
 .card {
     border-radius: 18px;
@@ -71,7 +71,7 @@ body {
     border-radius: 1.2rem;
 }
 
-/* ========== FIX CALCULAR MULTA ========== */
+/* Estilos para o Cálculo de Multa */
 .calcular-multa-card {
     max-width: 1100px;
     margin: 36px auto 0 auto;
@@ -147,7 +147,7 @@ body {
     letter-spacing: 0.7px;
 }
 
-/* Responsivo para Calcular Multa */
+/* Responsividade para Calcular Multa */
 @media (max-width: 1100px) {
     .calcular-multa-card { max-width: 98vw; padding: 2rem 1rem; }
 }
@@ -175,7 +175,7 @@ a.btn-outline-primary.mb-3:focus {
     color: #fff !important;
 }
 
-/* ==========  ESTILOS PERSONALIZADOS (ANTIGOS) ========== */
+/* Estilos personalizados gerais */
 input[type="file"].form-control {
     padding: 0.2rem 0.5rem;
     height: 2.1rem;
@@ -236,7 +236,6 @@ input[type="file"].form-control {
     .table thead, .table tbody, .table tr, .table th, .table td { font-size: 0.93rem; }
 }
 
-/* Botão modal igual aos principais */
 .btn-edit-feriados,
 #btnFeriados, .btn-modal, .btn-outline-primary {
     background: #fff;
@@ -292,7 +291,7 @@ input[type="file"].form-control-sm {
 }
 .resumo-consultor-card[data-index][style*='#198754'] { border-color: #198754 !important; }
 
-/* ================= MENU DE FUNCIONALIDADES =================== */
+/* Menu de funcionalidades */
 .menu-section-header {
     background: #246dec;
     color: #fff;
@@ -358,7 +357,7 @@ input[type="file"].form-control-sm {
     .menu-card { min-height: 100px; }
 }
 
-/* --------- Dark mode para Menu --------- */
+/* Dark mode para Menu */
 body.dark-mode .menu-section-header { background: #233154; color: #a2c2ff; }
 body.dark-mode .menu-cards-grid { background: #181d29; box-shadow: 0 2px 30px #090c1655; }
 body.dark-mode .menu-card {
@@ -375,7 +374,7 @@ body.dark-mode .menu-card:hover, body.dark-mode .menu-card:focus {
 }
 body.dark-mode .menu-card:hover .menu-icon, body.dark-mode .menu-card:focus .menu-icon { color: #a2cfff; }
 
-/* ================= LOGIN =================== */
+/* Login */
 .login-bg {
     min-height: 100vh;
     display: flex;
@@ -477,7 +476,7 @@ body.dark-mode .toggle-pwd:hover { color: #67a0f8; }
     .login-card { padding: 1.5rem 0.7rem 1.2rem 0.7rem; }
 }
 
-/* ========== TEST MODO ESCURO (DARK MODE) PARA TUDO  ========== */
+/* Dark mode para tudo */
 body.dark-mode {
     background-color: #111215 !important;
     color: #e6e6e6;
@@ -639,7 +638,7 @@ body.dark-mode .badge.status-squad { background: #4f6dff; color: #e3eaff; }
 body.dark-mode .badge.status-outros { background: #191f2b; color: #a7b8d9; }
 body.dark-mode .badge.status-prioridade { background: #d8bb00; color: #292408; }
 
-/* test Ajuste opcional para .table-quase, .table-atrasada, etc. */
+/* Ajuste opcional para .table-quase, .table-atrasada, etc. */
 
 body.dark-mode .badge.bg-success,
 body.dark-mode .badge.status-concluida {
@@ -674,7 +673,7 @@ tr.table-success,
 .table > tbody > tr.table-success,
 .table-success > td,
 .table-success > th {
-    background-color: #d1f4d6 !important; /* Verde Bootstrap light, ou escolha seu tone */
+    background-color: #d1f4d6 !important;
     color: #1a3a20 !important;
 }
 
@@ -683,7 +682,7 @@ body.dark-mode tr.table-success,
 body.dark-mode .table > tbody > tr.table-success,
 body.dark-mode .table-success > td,
 body.dark-mode .table-success > th {
-    background-color: #257a3e !important; /* Verde escuro para dark */
+    background-color: #257a3e !important;
     color: #e5ffe7 !important;
 }
 
@@ -718,5 +717,3 @@ body.dark-mode tr.table-success .badge {
     color: #fff !important;
     font-weight: 500;
 }
-
-/* ...fim :) */

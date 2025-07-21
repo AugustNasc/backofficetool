@@ -9,7 +9,6 @@
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h2 class="mb-0">Monitor Jurídico</h2>
         <div class="d-flex align-items-center">
-            {# REMOVIDO: Botão Finalizar Daily #}
             <button type="button" class="btn btn-outline-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#modalFeriados" style="min-width:140px;">
                 <i class="bi bi-calendar-event"></i> Ver/Editar Feriados
             </button>
@@ -37,7 +36,6 @@
             </button>
         </form>
 
-        {# Formulário de filtro por Proprietário (anteriormente Criada por) #}
         <form method="GET" action="{{ url_for('monitor_juridico') }}" class="d-flex align-items-center mb-4" style="gap:12px;">
             <label for="filter_proprietario" class="form-label mb-0 me-2"><strong>Filtrar por Proprietário:</strong></label>
             <select class="form-select form-select-sm" style="width:200px;max-width:200px;display:inline-block;" id="filter_proprietario" name="filter_proprietario">
@@ -72,7 +70,7 @@
                 </thead>
                 <tbody id="tbodyAtividades">
                     {% for a in atividades %}
-                        <tr class="{{ a.cor }}" data-original-class="{{ a.cor }}" data-id="{{ a.id }}" data-dias="{{ a.dias }}"> {# Adicionado data-dias #}
+                        <tr class="{{ a.cor }}" data-original-class="{{ a.cor }}" data-id="{{ a.id }}" data-dias="{{ a.dias }}">
                             <td>{{ a.data_criacao }}</td>
                             <td>{{ a.assunto }}</td>
                             <td>
@@ -153,7 +151,7 @@
                 </thead>
                 <tbody id="tbodyLiberacoes">
                     {% for l in liberacoes %}
-                        <tr class="{{ l.cor }}" data-original-class="{{ l.cor }}" data-id="{{ l.id }}" data-dias="{{ l.dias }}"> {# Adicionado data-dias #}
+                        <tr class="{{ l.cor }}" data-original-class="{{ l.cor }}" data-id="{{ l.id }}" data-dias="{{ l.dias }}">
                             <td>{{ l.data_criacao }}</td>
                             <td>{{ l.assunto }}</td>
                             <td>
@@ -188,7 +186,6 @@
                                         {% endfor %}
                                     {% endif %}
                                 </span>
-                                {# Botões de ação para liberações podem ser implementados de forma similar se necessário #}
                             </td>
                         </tr>
                     {% endfor %}
@@ -234,13 +231,12 @@
   </div>
 </div>
 
-{# NOVO MODAL DE FERIADOS #}
 <div class="modal fade" id="modalFeriados" tabindex="-1" aria-labelledby="modalFeriadosLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="modalFeriadosLabel"><i class="bi bi-calendar-event"></i> Feriados considerados</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <ul class="nav nav-tabs mb-3" id="holidayTabs" role="tablist">
@@ -255,7 +251,6 @@
           </li>
         </ul>
         <div class="tab-content" id="holidayTabContent">
-          {# TAB Feriados Salvos #}
           <div class="tab-pane fade show active" id="holidayList" role="tabpanel" aria-labelledby="list-tab">
             <p>Feriados atualmente registrados no sistema:</p>
             <textarea class="form-control mb-3" id="feriadosRawInput" name="feriados_raw_input" rows="7"
@@ -263,7 +258,6 @@
             <small class="form-text text-muted">Edite diretamente acima ou use a aba "Adicionar Feriado" para maior controle. Ao salvar, a lista será atualizada.</small>
           </div>
 
-          {# TAB Adicionar Feriado Manualmente #}
           <div class="tab-pane fade" id="holidayAdd" role="tabpanel" aria-labelledby="add-tab">
             <div class="row g-2 mb-3">
               <div class="col-md-6">
@@ -286,7 +280,6 @@
             <button type="button" class="btn btn-primary" id="btnAddManualHoliday"><i class="bi bi-plus-circle"></i> Adicionar Manualmente</button>
           </div>
 
-          {# TAB Buscar da API #}
           <div class="tab-pane fade" id="holidayFetch" role="tabpanel" aria-labelledby="fetch-tab">
             <div class="row g-2 mb-3">
               <div class="col-md-4">
@@ -316,7 +309,6 @@
     </div>
   </div>
 </div>
-{# Formulário para submeter a textarea. Fica fora do modal but is acionado pelo botão de salvar #}
 <form method="post" id="formFeriadosSubmit" style="display:none;">
     <input type="hidden" name="feriados_raw_input" id="hiddenFeriadosRawInput">
 </form>
@@ -328,9 +320,8 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     // === LÓGICA PARA OS BOTÕES DE AÇÃO NA TABELA ===
-    // Função auxiliar para determinar a classe de cor baseada nos dias
     function getOriginalColorClass(dias) {
-        if (dias === '-') return ''; // Se não há dias, não há cor específica
+        if (dias === '-') return '';
         dias = parseInt(dias);
         if (dias >= 5) {
             return 'table-danger';
@@ -339,14 +330,13 @@ document.addEventListener("DOMContentLoaded", function () {
         } else if (dias <= 1) {
             return 'table-primary';
         }
-        return ''; // Retorna vazio se não se encaixa em nenhuma categoria colorida
+        return '';
     }
 
-    // Status Concluída
     document.querySelectorAll(".btn-status").forEach(function (btn) {
         btn.addEventListener("click", function () {
             var tr = btn.closest("tr");
-            var atividadeId = tr.dataset.id; // Pega o ID da atividade
+            var atividadeId = tr.dataset.id;
             fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -356,16 +346,15 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(data => {
                 if (data.success) {
                     showToast('Atividade marcada como Concluída!', 'success');
-                    // Atualiza o frontend após sucesso no backend
-                    tr.classList.remove("atrasada", "quase-atrasando", "recem-criada", "table-area-externa"); // Remove pendência de área também
+                    tr.classList.remove("atrasada", "quase-atrasando", "recem-criada", "table-area-externa");
                     tr.classList.add("concluida", "table-success");
                     var spanStatus = tr.querySelector('.span-status');
                     if (spanStatus) spanStatus.textContent = "Concluída";
                     btn.style.display = "none";
                     tr.querySelector('.btn-desstatus').style.display = "";
-                    tr.querySelector('.btn-outraarea').style.display = "none"; // Esconde o botão de "outra área"
+                    tr.querySelector('.btn-outraarea').style.display = "none";
                     var badgesArea = tr.querySelector('.badges-area');
-                    if (badgesArea) badgesArea.innerHTML = ""; // Remove badges de área
+                    if (badgesArea) badgesArea.innerHTML = "";
                 } else {
                     showToast(data.message, 'danger');
                 }
@@ -377,7 +366,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Desmarcar Concluída
     document.querySelectorAll(".btn-desstatus").forEach(function (btn) {
         btn.addEventListener("click", function () {
             var tr = btn.closest("tr");
@@ -385,27 +373,24 @@ document.addEventListener("DOMContentLoaded", function () {
             fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action_type: 'status', new_value: 'Pendente' }) // Volta para Pendente padrão
+                body: JSON.stringify({ action_type: 'status', new_value: 'Pendente' })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     showToast('Atividade desmarcada como Concluída!', 'info');
-                    // Atualiza o frontend
-                    tr.classList.remove("concluida", "table-success", "table-area-externa"); // Remove area externa tb
+                    tr.classList.remove("concluida", "table-success", "table-area-externa");
                     
-                    // Re-aplica a cor original baseada nos dias
-                    const dias = tr.dataset.dias; // Pega os dias do data-dias
-                    const originalColorClass = getOriginalColorClass(dias); // Usa a nova função
+                    const dias = tr.dataset.dias;
+                    const originalColorClass = getOriginalColorClass(dias);
                     if (originalColorClass) {
                         tr.classList.add(originalColorClass);
                     } else {
-                        // Se não tem cor original, garante que não tem classes de cor antigas
                         tr.classList.remove('table-danger', 'table-warning', 'table-primary', 'table-secondary');
                     }
 
                     var spanStatus = tr.querySelector('.span-status');
-                    if (spanStatus) spanStatus.textContent = "Pendente"; // Volta para Pendente no texto
+                    if (spanStatus) spanStatus.textContent = "Pendente";
                     btn.style.display = "none";
                     tr.querySelector('.btn-status').style.display = "";
                     tr.querySelector('.btn-outraarea').style.display = "";
@@ -420,7 +405,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Priorizar
     document.querySelectorAll(".btn-prioridade").forEach(function (btn) {
         btn.addEventListener("click", function () {
             var tr = btn.closest("tr");
@@ -434,13 +418,12 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(data => {
                 if (data.success) {
                     showToast('Prioridade solicitada!', 'success');
-                    // Atualiza o frontend
                     tr.querySelector('.prioridade-label').innerHTML = "<b class='text-danger'>Solicitada</b>";
                     btn.style.display = "none";
                     tr.querySelector('.btn-desprioridade').style.display = "";
                     const tbody = tr.closest('tbody');
                     if (tbody) {
-                        tbody.insertBefore(tr, tbody.firstChild); // Move para o topo da tabela
+                        tbody.insertBefore(tr, tbody.firstChild);
                     }
                     tr.style.background = "#fffbe4";
                     setTimeout(function(){ tr.style.background = ""; }, 1200);
@@ -455,7 +438,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Remover Prioridade
     document.querySelectorAll(".btn-desprioridade").forEach(function (btn) {
         btn.addEventListener("click", function () {
             var tr = btn.closest("tr");
@@ -469,8 +451,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .then(data => {
                 if (data.success) {
                     showToast('Prioridade removida!', 'info');
-                    // Atualiza o frontend
-                    tr.querySelector('.prioridade-label').innerHTML = "Normal"; // Volta para "Normal" ou vazio
+                    tr.querySelector('.prioridade-label').innerHTML = "Normal";
                     btn.style.display = "none";
                     tr.querySelector('.btn-prioridade').style.display = "";
                 } else {
@@ -484,37 +465,34 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // Lógica para Pendente com Outra Área (Modal)
     let trSelecionada = null;
-    let areasTemp = []; // Armazena as áreas temporariamente para o modal
+    let areasTemp = [];
     const modalSelecionarArea = new bootstrap.Modal(document.getElementById('modalSelecionarArea'));
 
     document.querySelectorAll(".btn-outraarea").forEach(function(btn) {
         btn.addEventListener("click", function() {
             trSelecionada = btn.closest("tr");
-            // Se já tem status concluída, impede abrir o modal
             if (trSelecionada.classList.contains('concluida')) {
                 showToast('Atividades concluídas não permitem pendências em outras áreas.', 'warning');
                 return;
             }
 
-            areasTemp = []; // Limpa array temporário
+            areasTemp = [];
             var badgesArea = trSelecionada.querySelector('.badges-area');
             if (badgesArea && badgesArea.children.length > 0) {
-                // Preenche areasTemp com as áreas já existentes (remove "Pendente: ")
                 Array.from(badgesArea.querySelectorAll('.badge.bg-area')).forEach(badge => {
                     const areaText = badge.textContent.trim().replace('Pendente: ', '');
                     areasTemp.push(areaText);
                 });
             }
-            atualizarAreasSelecionadas(); // Atualiza o display no modal
-            modalSelecionarArea.show(); // Abre o modal
+            atualizarAreasSelecionadas();
+            modalSelecionarArea.show();
         });
     });
 
     document.getElementById('btnAddArea').addEventListener("click", function(){
         var area = document.getElementById('selectArea').value;
-        if (areasTemp.length < 4 && !areasTemp.includes(area)) { // Limite de 4 áreas
+        if (areasTemp.length < 4 && !areasTemp.includes(area)) {
             areasTemp.push(area);
             atualizarAreasSelecionadas();
         } else if (areasTemp.includes(area)) {
@@ -528,7 +506,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var div = document.getElementById('areasSelecionadas');
         var select = document.getElementById('selectArea');
         var btnAdd = document.getElementById('btnAddArea');
-        div.innerHTML = ""; // Limpa as áreas exibidas
+        div.innerHTML = "";
         if (areasTemp.length >= 4) {
             select.disabled = true;
             btnAdd.disabled = true;
@@ -546,8 +524,8 @@ document.addEventListener("DOMContentLoaded", function () {
         div.querySelectorAll(".btn-remover-area").forEach(function(btn){
             btn.onclick = function() {
                 var idx = parseInt(btn.getAttribute("data-idx"));
-                areasTemp.splice(idx, 1); // Remove a área do array temporário
-                atualizarAreasSelecionadas(); // Re-renderiza a lista
+                areasTemp.splice(idx, 1);
+                atualizarAreasSelecionadas();
             };
         });
     }
@@ -555,7 +533,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById('btnAplicarArea').addEventListener("click", function() {
         if (!trSelecionada) return;
         var atividadeId = trSelecionada.dataset.id;
-        const areasString = areasTemp.join(','); // Transforma o array de áreas em string separada por vírgula
+        const areasString = areasTemp.join(',');
 
         fetch(`/monitor_juridico/update_atividade/${atividadeId}`, {
             method: 'POST',
@@ -566,9 +544,8 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(data => {
             if (data.success) {
                 showToast('Pendência de área atualizada!', 'success');
-                // Atualiza o frontend
                 var badgesArea = trSelecionada.querySelector('.badges-area');
-                badgesArea.innerHTML = ""; // Limpa os badges existentes na linha da tabela
+                badgesArea.innerHTML = "";
                 if (areasTemp.length > 0) {
                     areasTemp.forEach(function(area, i){
                         var badge = document.createElement("span");
@@ -579,12 +556,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     });
                     trSelecionada.classList.remove("concluida", "table-success");
                     trSelecionada.classList.add("table-area-externa");
-                    // Atualiza o texto de status
                     const spanStatus = trSelecionada.querySelector('.span-status');
                     if (spanStatus) spanStatus.textContent = `Pendente: ${areasString.replace(/,/g, ', ')}`;
                 } else {
-                    trSelecionada.classList.remove("concluida", "table-success", "table-area-externa"); // Remover também a classe de área externa
-                    // Re-aplica a cor original baseada nos dias
+                    trSelecionada.classList.remove("concluida", "table-success", "table-area-externa");
                     const dias = trSelecionada.dataset.dias;
                     const originalColorClass = getOriginalColorClass(dias);
                     if (originalColorClass) {
@@ -593,7 +568,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         trSelecionada.classList.remove('table-danger', 'table-warning', 'table-primary', 'table-secondary');
                     }
                     const spanStatus = trSelecionada.querySelector('.span-status');
-                    if (spanStatus) spanStatus.textContent = `Pendente`; // Volta para Pendente se não tem áreas
+                    if (spanStatus) spanStatus.textContent = `Pendente`;
                 }
                 modalSelecionarArea.hide();
             } else {
@@ -622,12 +597,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const btnFetchHolidays = document.getElementById('btnFetchHolidays');
     const apiHolidaysResult = document.getElementById('apiHolidaysResult');
 
-    // Função para mostrar toast (assumindo que já existe ou é fornecida no base.html)
+    // Função para mostrar toast (centralizada no base.html)
+    // Se você já tem uma função showToast no base.html, remova esta definição duplicada.
+    // Caso contrário, esta é uma implementação básica.
     function showToast(message, category = 'info') {
         const toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
             console.error('Toast container not found');
-            alert(message); // Fallback
+            alert(message);
             return;
         }
         const toastEl = document.createElement('div');
@@ -658,9 +635,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Ao abrir o modal, garante que a textarea está atualizada com os feriados do backend
     modalFeriados.addEventListener('show.bs.modal', function () {
-        // Para garantir que a textarea sempre reflita o estado atual do DB
-        // Fetch para obter os feriados mais recentes e atualizar a textarea
-        fetch('/monitor_juridico/get_holidays_json') // Nova rota para buscar feriados em JSON
+        fetch('/monitor_juridico/get_holidays_json')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -676,12 +651,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Lógica para o botão "Salvar Todas as Mudanças" (da textarea)
     btnSaveFeriadosForm.addEventListener('click', function (event) {
-        // Captura o conteúdo da textarea
         hiddenFeriadosRawInput.value = feriadosRawInput.value;
-        // O formulário escondido será submetido
         document.getElementById('formFeriadosSubmit').submit();
     });
-
 
     // Lógica para Adicionar Feriado Manualmente
     btnAddManualHoliday.addEventListener('click', function () {
@@ -696,7 +668,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const holidayData = {
-            date: date, // AAAA-MM-DD
+            date: date,
             name: name,
             location: location,
             type: type
@@ -713,8 +685,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(data => {
             if (data.success) {
                 showToast(data.message, 'success');
-                // Após adicionar, recarregar a textarea para mostrar o novo feriado
-                modalFeriados.dispatchEvent(new Event('show.bs.modal')); // Dispara o evento para recarregar
+                modalFeriados.dispatchEvent(new Event('show.bs.modal'));
                 manualHolidayDate.value = '';
                 manualHolidayName.value = '';
                 manualHolidayLocation.value = '';
@@ -742,7 +713,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         apiHolidaysResult.innerHTML = '<div class="text-center text-primary"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Buscando feriados...</div>';
 
-        // Usamos URLSearchParams para construir a query string
         const params = new URLSearchParams({ ano: year });
         if (state) params.append('estado', state);
         if (city) params.append('municipio', city);
@@ -750,7 +720,7 @@ document.addEventListener("DOMContentLoaded", function () {
         fetch(`/fetch_holidays_api?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
-                apiHolidaysResult.innerHTML = ''; // Limpa a mensagem de carregamento
+                apiHolidaysResult.innerHTML = '';
                 if (data.success) {
                     if (data.holidays && data.holidays.length > 0) {
                         let html = '<p>Feriados encontrados (clique para adicionar):</p>';
@@ -773,7 +743,6 @@ document.addEventListener("DOMContentLoaded", function () {
                         html += '</ul>';
                         apiHolidaysResult.innerHTML = html;
 
-                        // Adiciona listeners para os botões "Adicionar" dos feriados da API
                         document.querySelectorAll('.btn-add-api-holiday').forEach(button => {
                             button.addEventListener('click', function() {
                                 const hData = this.dataset;
@@ -794,9 +763,8 @@ document.addEventListener("DOMContentLoaded", function () {
                                 .then(addResult => {
                                     if (addResult.success) {
                                         showToast(addResult.message, 'success');
-                                        // Após adicionar, recarregar a textarea para mostrar o novo feriado
-                                        modalFeriados.dispatchEvent(new Event('show.bs.modal')); // Dispara o evento para recarregar
-                                        this.disabled = true; // Desabilita o botão após adicionar
+                                        modalFeriados.dispatchEvent(new Event('show.bs.modal'));
+                                        this.disabled = true;
                                         this.innerHTML = '<i class="bi bi-check-lg"></i> Adicionado';
                                         this.classList.replace('btn-outline-success', 'btn-success');
                                     } else {

@@ -10,12 +10,30 @@ import statistics
 import json 
 import unicodedata 
 
+from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal, CorrecaoMonetariaHistorico, CnpjConsultaHistorico # Adicionar CnpjConsultaHistorico aqui
+
+
 from datetime import datetime, timedelta, date
 from uuid import uuid4
 from io import BytesIO
 from functools import wraps
 
 from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal
+
+from models import db, User, Log, Pleito, Role, Configuracao, Feriado, AtividadeJuridica, Cancelamento, SlaMensal, CorrecaoMonetariaHistorico # Adicionar CorrecaoMonetariaHistorico aqui
+
+# ...
+
+# Na seção de imports de Utils do projeto:
+from utils.pdf_generator import preparar_base_pdf, exportar_sla_pdf
+from utils.excel_export import preparar_base_excel, exportar_sla_excel, exportar_logs_excel
+from utils.file_processing import (
+    process_hotlines,
+    analyze_pleitos, filtrar_clientes_excluidos, safe_float
+)
+from utils.dias_uteis import dias_uteis_entre_datas
+from utils.value_correction import corrigir_valor, normalizar_data # ADICIONAR normalizar_data AQUI
+from utils.auth import authenticate_user
 
 
 from flask import (
@@ -2063,6 +2081,8 @@ def sla_dashboard():
 def correcao_valores():
     resultado = None
     indices = ['IPCA', 'IGPM']
+    nome_cliente_formulario = None # Para manter o nome digitado no formulário após post
+    
     if 'username' not in session:
         return redirect(url_for('login'))
 
@@ -2076,61 +2096,279 @@ def correcao_valores():
              return redirect(url_for('correcao_valores'))
 
         indice = request.form.get('indice')
-        data_final = request.form.get('data_final')
-        datas_iniciais = request.form.getlist('data_inicial[]')
-        valores = request.form.getlist('valor[]')
-        resultado = []
+        data_final_str = request.form.get('data_final')
+        nome_cliente_formulario = request.form.get('nome_cliente', '').strip() # Captura o nome do cliente do formulário
+
+        acao = request.form.get('acao') # 'calcular_manual' ou 'upload_planilha'
         
-        all_success = True
-        for idx, (data_inicial, valor) in enumerate(zip(datas_iniciais, valores)):
+        # Converte data_final para objeto date ANTES de passar para o modelo
+        try:
+            data_final_obj = datetime.strptime(normalizar_data(data_final_str, is_final=True), '%Y-%m-%d').date()
+        except ValueError:
+            flash('Formato da Data Final inválido. Use DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA.', 'danger')
+            return redirect(url_for('correcao_valores'))
+
+        temp_results = [] # Lista temporária para acumular resultados do POST
+
+        if acao == 'calcular_manual':
+            datas_iniciais = request.form.getlist('data_inicial[]')
+            valores = request.form.getlist('valor[]')
+
+            all_success = True
+            for idx, (data_inicial_str, valor_str) in enumerate(zip(datas_iniciais, valores)):
+                try:
+                    valor = float(valor_str)
+                    res = corrigir_valor(valor, data_inicial_str, data_final_str, indice)
+                    
+                    data_inicial_obj = datetime.strptime(normalizar_data(data_inicial_str, is_final=False), '%Y-%m-%d').date()
+
+                    new_history_entry = CorrecaoMonetariaHistorico(
+                        user_id=user_id,
+                        nome_cliente=nome_cliente_formulario if nome_cliente_formulario else None,
+                        indice_utilizado=indice,
+                        data_inicial=data_inicial_obj,
+                        data_final=data_final_obj,
+                        valor_original=valor,
+                        valor_corrigido=res['valor_corrigido'],
+                        percentual_acumulado=res['percentual_acumulado'],
+                        fator_acumulado=res['fator_acumulado'],
+                        origem_calculo='Manual',
+                        detalhes_erro=None
+                    )
+                    db.session.add(new_history_entry)
+
+                    # Adiciona ao resultado temporário para exibir na mesma requisição
+                    temp_results.append({
+                        'id': new_history_entry.id, # Usar o ID do registro salvo
+                        'data_inicial': data_inicial_str,
+                        'valor_original': valor_str,
+                        'valor_corrigido': res['valor_corrigido'],
+                        'indice_utilizado': res['indice_utilizado'],
+                        'percentual_acumulado': res['percentual_acumulado'],
+                        'fator_acumulado': res['fator_acumulado'],
+                        'erro': None
+                    })
+                    
+                    log_details = f"Valor de R${valor:.2f} de {data_inicial_str} corrigido para R${res['valor_corrigido']:.2f} até {data_final_str} usando {indice}. Cliente: {nome_cliente_formulario or 'N/A'}."
+                    new_log = Log(action="CORRECAO_MONETARIA_SUCESSO", details=log_details, user_id=user_id, timestamp=datetime.utcnow(), nome_cliente=nome_cliente_formulario)
+                    db.session.add(new_log)
+
+                except Exception as e:
+                    error_msg = f"Erro ao corrigir o valor para a data '{data_inicial_str}': {str(e)}. Use formato DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA."
+                    flash(error_msg, "danger")
+                    logger.error(f"Erro na correção monetária (manual): {str(e)} para data {data_inicial_str}, valor {valor_str}, indice {indice}")
+                    
+                    # Adiciona ao resultado temporário, marcando o erro
+                    temp_results.append({
+                        'id': idx, # Usar um ID temporário se não for salvo
+                        'data_inicial': data_inicial_str,
+                        'valor_original': valor_str,
+                        'valor_corrigido': 0, 
+                        'indice_utilizado': indice,
+                        'percentual_acumulado': 0,
+                        'fator_acumulado': 0,
+                        'erro': error_msg
+                    })
+                    all_success = False
+                    log_details = f"Erro ao corrigir valor (manual) (data_inicial={data_inicial_str}, valor_original={valor_str}, indice={indice}): {str(e)}. Cliente: {nome_cliente_formulario or 'N/A'}."
+                    new_log = Log(action="CORRECAO_MONETARIA_ERRO", details=log_details, user_id=user_id, timestamp=datetime.utcnow(), nome_cliente=nome_cliente_formulario)
+                    db.session.add(new_log)
+            
+            db.session.commit() # Commit para salvar os históricos e logs
+            if all_success and temp_results:
+                flash("Cálculo(s) de correção monetária realizado(s) com sucesso e salvo(s) no histórico!", "success")
+            
+        elif acao == 'upload_planilha':
+            file = request.files.get('file_correcao')
+            if not file or file.filename == '':
+                flash('Nenhum arquivo selecionado para upload.', 'danger')
+                return redirect(url_for('correcao_valores'))
+            
+            if not (file.filename.lower().endswith('.xlsx') or file.filename.lower().endswith('.xls')):
+                flash('Formato de arquivo inválido. Por favor, use .xlsx ou .xls.', 'danger')
+                return redirect(url_for('correcao_valores'))
+
             try:
-                res = corrigir_valor(float(valor), data_inicial, data_final, indice)
-                valor_corrigido = res['valor_corrigido']
-                indice_utilizado = res['indice_utilizado']
-                percentual_acumulado = res['percentual_acumulado']
-                fator_acumulado = res['fator_acumulado']
+                df = pd.read_excel(file)
+                required_cols = ['Data Inicial', 'Valor']
+                if not all(col in df.columns for col in required_cols):
+                    missing = [col for col in required_cols if col not in df.columns]
+                    flash(f'Planilha inválida. Colunas obrigatórias faltando: {", ".join(missing)}.', 'danger')
+                    return redirect(url_for('correcao_valores'))
+
+                all_success = True
+                for idx, row in df.iterrows():
+                    # Trata a data para garantir que seja apenas a parte da data, sem tempo
+                    data_inicial_excel = row['Data Inicial']
+                    if pd.notna(data_inicial_excel):
+                        if isinstance(data_inicial_excel, datetime):
+                            data_inicial_str = data_inicial_excel.strftime('%d/%m/%Y') # Formata como DD/MM/AAAA
+                        elif isinstance(data_inicial_excel, date):
+                            data_inicial_str = data_inicial_excel.strftime('%d/%m/%Y') # Formata como DD/MM/AAAA
+                        else: # Tenta converter strings genéricas
+                            data_inicial_str = str(data_inicial_excel).strip()
+                    else:
+                        data_inicial_str = '' # Ou trate como erro se a data for NaN
+
+                    valor_str = str(row['Valor']).strip()
+                    
+                    try:
+                        valor = float(valor_str)
+                        res = corrigir_valor(valor, data_inicial_str, data_final_str, indice)
+                        
+                        data_inicial_obj = datetime.strptime(normalizar_data(data_inicial_str, is_final=False), '%Y-%m-%d').date()
+
+                        new_history_entry = CorrecaoMonetariaHistorico(
+                            user_id=user_id,
+                            nome_cliente=nome_cliente_formulario if nome_cliente_formulario else None,
+                            indice_utilizado=indice,
+                            data_inicial=data_inicial_obj,
+                            data_final=data_final_obj,
+                            valor_original=valor,
+                            valor_corrigido=res['valor_corrigido'],
+                            percentual_acumulado=res['percentual_acumulado'],
+                            fator_acumulado=res['fator_acumulado'],
+                            origem_calculo='Planilha',
+                            detalhes_erro=None
+                        )
+                        db.session.add(new_history_entry)
+
+                        temp_results.append({
+                            'id': new_history_entry.id,
+                            'data_inicial': data_inicial_str,
+                            'valor_original': valor_str,
+                            'valor_corrigido': res['valor_corrigido'],
+                            'indice_utilizado': res['indice_utilizado'],
+                            'percentual_acumulado': res['percentual_acumulado'],
+                            'fator_acumulado': res['fator_acumulado'],
+                            'erro': None
+                        })
+                        
+                        log_details = f"Valor de R${valor:.2f} de {data_inicial_str} corrigido para R${res['valor_corrigido']:.2f} até {data_final_str} usando {indice} via planilha. Cliente: {nome_cliente_formulario or 'N/A'}."
+                        new_log = Log(action="CORRECAO_MONETARIA_SUCESSO_PLANILHA", details=log_details, user_id=user_id, timestamp=datetime.utcnow(), nome_cliente=nome_cliente_formulario)
+                        db.session.add(new_log)
+
+                    except Exception as e:
+                        error_msg = f"Erro na linha {idx+2} da planilha (Data: '{data_inicial_str}', Valor: '{valor_str}'): {str(e)}. Verifique formato."
+                        flash(error_msg, "danger")
+                        logger.error(f"Erro na correção monetária (planilha, linha {idx+2}): {str(e)}")
+
+                        temp_results.append({
+                            'id': idx, # ID temporário para erros não salvos
+                            'data_inicial': data_inicial_str,
+                            'valor_original': valor_str,
+                            'valor_corrigido': 0,
+                            'indice_utilizado': indice,
+                            'percentual_acumulado': 0,
+                            'fator_acumulado': 0,
+                            'erro': error_msg
+                        })
+                        all_success = False
+                        log_details = f"Erro ao corrigir valor (planilha, linha {idx+2}, data_inicial={data_inicial_str}, valor_original={valor_str}, indice={indice}): {str(e)}. Cliente: {nome_cliente_formulario or 'N/A'}."
+                        new_log = Log(action="CORRECAO_MONETARIA_ERRO_PLANILHA", details=log_details, user_id=user_id, timestamp=datetime.utcnow(), nome_cliente=nome_cliente_formulario)
+                        db.session.add(new_log)
                 
-                new_log = Log(
-                    action="CORRECAO_MONETARIA_SUCESSO",
-                    details=f"Valor de R${float(valor):.2f} de {data_inicial} corrigido para R${valor_corrigido:.2f} até {data_final} usando {indice_utilizado}.",
-                    user_id=user_id,
-                    timestamp=datetime.utcnow()
-                )
-                db.session.add(new_log)
-                db.session.commit()
+                db.session.commit() # Commit para salvar os históricos e logs
+                if all_success and temp_results:
+                    flash(f"Correção monetária de planilha concluída! {len(temp_results)} registro(s) processado(s) e salvo(s) no histórico.", "success")
 
             except Exception as e:
-                flash(f"Erro ao corrigir o valor para a data '{data_inicial}': {str(e)}. Use formato DD/MM/AAAA, AAAA-MM-DD ou MM/AAAA.", "danger")
-                logger.error(f"Erro na correção monetária: {str(e)} para data {data_inicial}, valor {valor}, indice {indice}")
-                valor_corrigido = "Erro"
-                indice_utilizado = '-'
-                percentual_acumulado = '-'
-                fator_acumulado = '-'
-                all_success = False
-                new_log = Log(
-                    action="CORRECAO_MONETARIA_ERRO",
-                    details=f"Erro ao corrigir valor (data_inicial={data_inicial}, valor_original={valor}, indice={indice}): {str(e)}",
-                    user_id=user_id,
-                    timestamp=datetime.utcnow()
-                )
+                db.session.rollback()
+                flash(f'Erro ao processar o arquivo Excel: {str(e)}', 'danger')
+                logger.error(f"Erro geral ao ler planilha para correção monetária: {str(e)}")
+                log_details = f"Erro geral ao processar planilha de correção: {str(e)}. Cliente: {nome_cliente_formulario or 'N/A'}."
+                new_log = Log(action="CORRECAO_MONETARIA_ERRO_UPLOAD", details=log_details, user_id=user_id, timestamp=datetime.utcnow(), nome_cliente=nome_cliente_formulario)
                 db.session.add(new_log)
                 db.session.commit()
+                return redirect(url_for('correcao_valores'))
 
-            resultado.append({
-                'id': idx,
-                'data_inicial': data_inicial,
-                'valor_original': valor,
-                'valor_corrigido': valor_corrigido,
-                'indice_utilizado': indice_utilizado,
-                'percentual_acumulado': percentual_acumulado,
-                'fator_acumulado': fator_acumulado
-            })
-        
-        if all_success and resultado:
-            flash("Cálculo de correção monetária realizado com sucesso!", "success")
+    # Para requisições GET ou após o POST, carrega os históricos
+    # Filtra por user_id, mas permite ao admin ver todos, se for o caso
+    if user and user.role.can_manage_users: # Se o usuário for admin, vê todos os históricos
+        historicos_db = CorrecaoMonetariaHistorico.query.order_by(CorrecaoMonetariaHistorico.data_calculo.desc()).limit(10).all() # Limita para não sobrecarregar
+    else: # Usuário comum vê apenas os seus
+        historicos_db = CorrecaoMonetariaHistorico.query.filter_by(user_id=user_id).order_by(CorrecaoMonetariaHistorico.data_calculo.desc()).limit(10).all()
 
+    # Formata os históricos para exibição no template
+    historico_para_template = []
+    for h in historicos_db:
+        historico_para_template.append({
+            'id': h.id,
+            'nome_cliente': h.nome_cliente if h.nome_cliente else 'N/A',
+            'data_calculo': h.data_calculo.strftime('%d/%m/%Y %H:%M:%S'),
+            'data_inicial': h.data_inicial.strftime('%d/%m/%Y'),
+            'data_final': h.data_final.strftime('%d/%m/%Y'),
+            'valor_original': h.valor_original,
+            'valor_corrigido': h.valor_corrigido,
+            'indice_utilizado': h.indice_utilizado,
+            'percentual_acumulado': h.percentual_acumulado,
+            'fator_acumulado': h.fator_acumulado,
+            'origem_calculo': h.origem_calculo,
+            'erro': h.detalhes_erro # Se houver um erro registrado
+        })
+
+    # Passa o 'resultado' que veio do POST (se houver) E o 'historico_para_template'
     hoje = datetime.now().strftime('%Y-%m-%d')
-    return render_template('correcao_valores.html', indices=indices, hoje=hoje, resultado=resultado)
+    return render_template(
+        'correcao_valores.html', 
+        indices=indices, 
+        hoje=hoje, 
+        resultado=temp_results if 'temp_results' in locals() else None, # Exibe os resultados do último POST
+        nome_cliente_resultado=nome_cliente_formulario, # Exibe o nome do cliente do último POST
+        historico_calculos=historico_para_template # Exibe o histórico salvo
+    )
+
+
+@app.route('/correcao-valores/api/cotacoes', methods=['GET'])
+@permission_required('can_access_correcao_valores')
+def get_cotacoes_api():
+    indice_param = request.args.get('indice')
+    periodo_param = request.args.get('periodo', '12') # Padrão para 12 meses
+
+    if indice_param not in ['IPCA', 'IGPM']:
+        return jsonify({'success': False, 'message': 'Índice não suportado.'}), 400
+
+    codigo = 0
+    if indice_param == 'IPCA':
+        codigo = 433  # IPCA
+    elif indice_param == 'IGPM':
+        codigo = 189  # IGP-M
+    
+    url = f'https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados?formato=json'
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status() # Lança exceção para erros HTTP
+        data = response.json()
+
+        # Filtrar para o período desejado (últimos 'periodo' meses)
+        if data:
+            df = pd.DataFrame(data)
+            df['data'] = pd.to_datetime(df['data'], dayfirst=True)
+            df['valor'] = df['valor'].str.replace(',', '.').astype(float)
+            df_filtered = df.sort_values(by='data', ascending=True).tail(int(periodo_param)) # Pega os últimos 'periodo' meses
+            
+            quotes = []
+            for _, row in df_filtered.iterrows():
+                quotes.append({
+                    'data_bruta': row['data'].strftime('%Y-%m-%d'),
+                    'data_formatada': row['data'].strftime('%m/%Y'),
+                    'valor': row['valor']
+                })
+            
+            return jsonify({'success': True, 'quotes': quotes})
+        
+        return jsonify({'success': False, 'message': 'Nenhum dado encontrado para o índice.'})
+
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout ao buscar dados da API do BCB para {indice_param}.")
+        return jsonify({'success': False, 'message': 'Tempo limite da API excedido.'}), 504
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Erro ao conectar ou buscar dados da API do BCB para {indice_param}: {e}")
+        return jsonify({'success': False, 'message': f'Erro ao buscar dados do índice: {e}'}), 500
+    except Exception as e:
+        logger.error(f"Erro inesperado ao processar dados de {indice_param}: {e}")
+        return jsonify({'success': False, 'message': f'Erro inesperado: {e}'}), 500
 
 @app.template_filter('br_decimal')
 def br_decimal(value, casas=2):
@@ -2277,106 +2515,273 @@ def contas_transicao():
     return redirect(url_for('principal'))
 
 
+# Certifique-se de que CnpjConsultaHistorico está importado no topo do seu app.py, junto com os outros modelos.
+# Ex: from models import ..., CnpjConsultaHistorico
+
+# Certifique-se de que pytz está importado para lidar com fusos horários.
+import pytz
+
+# ... (restante do seu código app.py) ...
+
+
+import pytz # Certifique-se de que este import está no topo do seu app.py
+
 @app.route('/consulta_cnpj', methods=['GET', 'POST'])
-@permission_required('can_access_consulta_cnpj') # Acesso à consulta CNPJ
+@permission_required('can_access_consulta_cnpj')
 def consulta_cnpj():
-    resultado = None
-    erro = None
-    cnpj_input = ''
+    cnpj_data = None # Dados da consulta mais recente para exibição no topo
+    
     if 'username' not in session:
         return redirect(url_for('login'))
 
     user = User.query.filter_by(username=session['username']).first()
     user_id = user.id if user else None
 
-    if request.method == 'POST':
-        cnpj_input = request.form.get('cnpj', '').strip()
-        cnpj = re.sub(r'\D', '', cnpj_input)
-        if len(cnpj) != 14:
-            erro = 'CNPJ inválido. Insira 14 dígitos.'
-            new_log = Log(
-                action="CONSULTA_CNPJ_INVALIDO",
-                details=f"Tentativa de consulta CNPJ inválido: '{cnpj_input}'.",
-                user_id=user_id,
-                timestamp=datetime.utcnow()
-            )
-            db.session.add(new_log)
-            db.session.commit()
+    # Define o fuso horário de São Paulo para consistência
+    sp_tz = pytz.timezone('America/Sao_Paulo')
 
-        else:
-            url = f'https://brasilapi.com.br/api/cnpj/v1/{cnpj}'
+    if request.method == 'POST':
+        cnpj_input = request.form.get('cnpj')
+        if not cnpj_input:
+            flash('Por favor, insira um CNPJ.', 'danger')
+            return redirect(url_for('consulta_cnpj'))
+
+        cnpj_limpo = ''.join(filter(str.isdigit, cnpj_input))
+        if len(cnpj_limpo) != 14:
+            flash('CNPJ inválido. Deve conter 14 dígitos.', 'danger')
+            return redirect(url_for('consulta_cnpj'))
+
+        # Tenta buscar o CNPJ no histórico primeiro
+        historico_entry = CnpjConsultaHistorico.query.filter_by(cnpj=cnpj_limpo).first()
+        
+        # Define o tempo de validade do cache (em dias)
+        CACHE_VALIDADE_DIAS = 1
+        
+        # Flag para indicar se uma nova busca na API é necessária
+        needs_api_call = True
+        
+        if historico_entry:
+            # Se existe no histórico, verifica a data da última consulta/atualização
+            agora_utc = datetime.utcnow()
+            diferenca_dias = (agora_utc - historico_entry.data_consulta).days
+            
+            if diferenca_dias < CACHE_VALIDADE_DIAS:
+                # Dados ainda válidos, usa o cache
+                flash(f"Dados do CNPJ {cnpj_limpo} recuperados do histórico (atualizado há {diferenca_dias} dias).", "info")
+                cnpj_data = json.loads(historico_entry.dados_json)
+                needs_api_call = False
+            else:
+                # Dados antigos, precisa de nova busca na API
+                flash(f"Dados do CNPJ {cnpj_limpo} no histórico estão desatualizados ({diferenca_dias} dias). Tentando atualizar...", "warning")
+
+        if needs_api_call:
+            url = f"https://brasilapi.com.br/api/cnpj/v1/{cnpj_limpo}"
             try:
-                resp = requests.get(url, timeout=10)
-                if resp.status_code == 200:
-                    dados = resp.json()
-                    resultado = {
-                        'CNPJ': dados.get('cnpj', 'Não informado'),
-                        'Nome': dados.get('razao_social', 'Não informado'),
-                        'Fantasia': dados.get('nome_fantasia', 'Não informado'),
-                        'Abertura': dados.get('data_abertura', 'Não informado'),
-                        'Situação': dados.get('descricao_situacao_cadastral', 'Não informado'),
-                        'Natureza Jurídica': dados.get('natureza_juridica', 'Não informado'),
-                        'Atividade Principal': dados.get('cnae_fiscal_descricao', 'Não informado'),
-                        'UF': dados.get('uf', 'Não informado'),
-                        'Município': dados.get('municipio', 'Não informado'),
-                        'Telefone': dados.get('ddd_telefone_1', 'Não informado'),
-                        'Email': dados.get('email', 'Não informado'),
-                        'Logradouro': dados.get('logradouro', 'Não informado'),
-                        'Número': dados.get('numero', 'Não informado'),
-                        'Complemento': dados.get('complemento', ''),
-                        'Bairro': dados.get('bairro', 'Não informado'),
-                        'CEP': dados.get('cep', 'Não informado'),
-                    }
-                    flash(f"CNPJ {cnpj} consultado com sucesso!", "success")
-                    new_log = Log(
-                        action="CONSULTA_CNPJ_SUCESSO",
-                        details=f"CNPJ '{cnpj}' consultado com sucesso. Razão Social: '{resultado.get('Nome', 'Não informado')}'",
-                        user_id=user_id,
-                        nome_cliente=resultado.get('Nome', None),
-                        timestamp=datetime.utcnow()
-                    )
-                    db.session.add(new_log)
+                response = requests.get(url, timeout=10)
+                response.raise_for_status() # Lança exceção para erros HTTP (4xx, 5xx)
+                api_response_data = response.json()
+                
+                # Se chegou aqui, a API respondeu com sucesso
+                cnpj_data = api_response_data
+                
+                if historico_entry:
+                    # Atualiza o registro existente
+                    historico_entry.razao_social = cnpj_data.get('razao_social')
+                    historico_entry.nome_fantasia = cnpj_data.get('nome_fantasia')
+                    historico_entry.data_consulta = datetime.utcnow() # Atualiza o timestamp da consulta
+                    historico_entry.dados_json = json.dumps(cnpj_data)
                     db.session.commit()
+                    flash(f"Dados do CNPJ {cnpj_limpo} atualizados com sucesso da BrasilAPI.", "success")
                 else:
-                    erro = 'CNPJ não encontrado ou API indisponível.'
-                    flash(erro, "danger")
-                    new_log = Log(
-                        action="CONSULTA_CNPJ_FALHA",
-                        details=f"Consulta CNPJ falhou para '{cnpj}': {erro}",
+                    # Cria um novo registro
+                    new_history_entry = CnpjConsultaHistorico(
                         user_id=user_id,
-                        timestamp=datetime.utcnow()
+                        cnpj=cnpj_limpo, # Salva o CNPJ limpo para consistência
+                        razao_social=cnpj_data.get('razao_social'),
+                        nome_fantasia=cnpj_data.get('nome_fantasia'),
+                        data_consulta=datetime.utcnow(),
+                        dados_json=json.dumps(cnpj_data)
                     )
-                    db.session.add(new_log)
+                    db.session.add(new_history_entry)
                     db.session.commit()
+                    flash(f"CNPJ {cnpj_limpo} consultado e salvo no histórico com sucesso.", "success")
+                
+                log_details = f"Consulta CNPJ: {cnpj_limpo} - {cnpj_data.get('razao_social', 'N/A')} (API)."
+                new_log = Log(action="CONSULTA_CNPJ_SUCESSO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
+                db.session.add(new_log)
+                db.session.commit()
+
             except requests.exceptions.Timeout:
-                erro = 'Tempo limite da consulta excedido. Tente novamente.'
-                flash(erro, "danger")
-                new_log = Log(
-                    action="CONSULTA_CNPJ_TIMEOUT",
-                    details=f"Tempo limite excedido na consulta CNPJ para '{cnpj}'.",
-                    user_id=user_id,
-                    timestamp=datetime.utcnow()
-                )
+                flash('Tempo limite da API excedido. Tentando usar dados antigos...', 'warning')
+                if historico_entry:
+                    cnpj_data = json.loads(historico_entry.dados_json) # Usa os dados do cache mesmo que antigos
+                    flash(f"Dados do CNPJ {cnpj_limpo} recuperados do histórico (podem estar desatualizados).", "info")
+                else:
+                    flash(f"CNPJ {cnpj_limpo} não encontrado no histórico e a API falhou. Tente novamente.", "danger")
+                    cnpj_data = None # Não há dados para exibir
+                logger.error(f"Timeout ao consultar CNPJ {cnpj_limpo}.")
+                log_details = f"Consulta CNPJ: {cnpj_limpo} - Timeout da API."
+                new_log = Log(action="CONSULTA_CNPJ_ERRO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
+                db.session.add(new_log)
+                db.session.commit()
+            except requests.exceptions.RequestException as e:
+                # Erros de conexão ou HTTP (404, 500 etc.)
+                error_message = str(e)
+                if response.status_code == 404:
+                    error_message = "CNPJ não encontrado na BrasilAPI."
+                    flash(f"Erro: {error_message}", "warning")
+                else:
+                    flash(f'Erro na requisição à API: {error_message}. Tentando usar dados antigos...', 'danger')
+                
+                if historico_entry:
+                    cnpj_data = json.loads(historico_entry.dados_json) # Usa os dados do cache mesmo que antigos
+                    flash(f"Dados do CNPJ {cnpj_limpo} recuperados do histórico (podem estar desatualizados).", "info")
+                else:
+                    flash(f"CNPJ {cnpj_limpo} não encontrado no histórico e a API falhou. Tente novamente.", "danger")
+                    cnpj_data = None # Não há dados para exibir
+                logger.error(f"Erro na requisição da API para CNPJ {cnpj_limpo}: {e}")
+                log_details = f"Consulta CNPJ: {cnpj_limpo} - Erro na requisição da API: {error_message}."
+                new_log = Log(action="CONSULTA_CNPJ_ERRO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
+                db.session.add(new_log)
+                db.session.commit()
+            except json.JSONDecodeError:
+                flash('Erro ao decodificar a resposta da API (JSON inválido). Tentando usar dados antigos...', 'danger')
+                if historico_entry:
+                    cnpj_data = json.loads(historico_entry.dados_json) # Usa os dados do cache
+                    flash(f"Dados do CNPJ {cnpj_limpo} recuperados do histórico (podem estar desatualizados).", "info")
+                else:
+                    flash(f"CNPJ {cnpj_limpo} não encontrado no histórico e a API retornou JSON inválido. Tente novamente.", "danger")
+                    cnpj_data = None
+                logger.error(f"Erro JSONDecodeError ao consultar CNPJ {cnpj_limpo}.")
+                log_details = f"Consulta CNPJ: {cnpj_limpo} - Erro de decodificação JSON."
+                new_log = Log(action="CONSULTA_CNPJ_ERRO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
                 db.session.add(new_log)
                 db.session.commit()
             except Exception as e:
-                erro = f'Erro na consulta: {e}'
-                flash(erro, "danger")
-                logger.error(f"Erro inesperado na consulta CNPJ: {str(e)}")
-                new_log = Log(
-                    action="CONSULTA_CNPJ_ERRO",
-                    details=f"Erro inesperado na consulta CNPJ para '{cnpj}': {str(e)}",
-                    user_id=user_id,
-                    timestamp=datetime.utcnow()
-                )
+                flash(f'Ocorreu um erro inesperado: {e}. Tentando usar dados antigos...', 'danger')
+                if historico_entry:
+                    cnpj_data = json.loads(historico_entry.dados_json) # Usa os dados do cache
+                    flash(f"Dados do CNPJ {cnpj_limpo} recuperados do histórico (podem estar desatualizados).", "info")
+                else:
+                    flash(f"CNPJ {cnpj_limpo} não encontrado no histórico e ocorreu um erro inesperado. Tente novamente.", "danger")
+                    cnpj_data = None
+                logger.error(f"Erro inesperado ao consultar CNPJ {cnpj_limpo}: {e}")
+                log_details = f"Consulta CNPJ: {cnpj_limpo} - Erro inesperado: {e}."
+                new_log = Log(action="CONSULTA_CNPJ_ERRO", details=log_details, user_id=user_id, timestamp=datetime.utcnow())
                 db.session.add(new_log)
                 db.session.commit()
+        
+        if not cnpj_data and historico_entry: # Se não conseguiu novos dados mas tinha um histórico, exibe o histórico
+             cnpj_data = json.loads(historico_entry.dados_json)
 
-    return render_template('consulta_cnpj.html', resultado=resultado, erro=erro, cnpj_input=cnpj_input)
+
+    # Carrega o histórico de consultas para exibição na tabela
+    # Se for admin, vê todos os históricos (limitado a 10)
+    if user and user.role.can_manage_users: 
+        historico_consultas_db = CnpjConsultaHistorico.query.options(db.joinedload(CnpjConsultaHistorico.user)).order_by(CnpjConsultaHistorico.data_consulta.desc()).limit(10).all()
+    # Usuário comum vê apenas os seus (limitado a 10)
+    else: 
+        historico_consultas_db = CnpjConsultaHistorico.query.options(db.joinedload(CnpjConsultaHistorico.user)).filter_by(user_id=user_id).order_by(CnpjConsultaHistorico.data_consulta.desc()).limit(10).all()
+
+    historico_para_template = []
+    for h in historico_consultas_db:
+        # Garante que dados_json é uma string JSON válida. Se h.dados_json for None, usa um JSON vazio '{}'.
+        # O filtro |tojson no HTML será usado para a serialização e escape para o atributo data-json.
+        dados_json_seguro = h.dados_json if h.dados_json else '{}' 
+
+        # Converte a data UTC para o fuso horário de São Paulo para exibição
+        data_local = h.data_consulta.replace(tzinfo=pytz.utc).astimezone(sp_tz)
+
+        historico_para_template.append({
+            'id': h.id,
+            'cnpj': h.cnpj,
+            'razao_social': h.razao_social if h.razao_social else 'N/A',
+            'nome_fantasia': h.nome_fantasia if h.nome_fantasia else 'N/A',
+            'data_consulta': data_local.strftime('%d/%m/%Y %H:%M:%S'), # Data formatada localmente
+            'user_username': h.user.username if h.user else 'N/A', 
+            'dados_json': dados_json_seguro 
+        })
+
+    return render_template('consulta_cnpj.html', cnpj_data=cnpj_data, historico_consultas=historico_para_template)
 
 @app.route('/logos/<filename>')
 def uploaded_logo(filename):
     return send_from_directory(app.config['UPLOAD_LOGO_FOLDER'], filename)
+
+@app.route('/meu_perfil')
+@permission_required('can_view_all') 
+def meu_perfil():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        flash('Usuário não encontrado.', 'danger')
+        session.clear() 
+        return redirect(url_for('login'))
+
+    cargo_usuario = user.role.name if user.role else 'Não atribuído'
+
+    # NOVO: Verifica e formata a data de criação no Python
+    data_criacao_formatada = 'Não disponível'
+    # ATENÇÃO: A COLUNA 'created_at' NÃO EXISTE NO SEU MODELO USER ATUALMENTE.
+    # Se quiser que esta data apareça, você PRECISA adicionar:
+    # created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # no seu modelo 'User' em models.py e rodar uma migração.
+    # Caso contrário, ela sempre exibirá "Não disponível".
+    if hasattr(user, 'created_at') and user.created_at:
+        data_criacao_formatada = user.created_at.strftime('%d/%m/%Y às %H:%M')
+
+    return render_template('meu_perfil.html', user=user, cargo=cargo_usuario, data_criacao=data_criacao_formatada)
+
+@app.route('/alterar_senha', methods=['GET', 'POST'])
+@permission_required('can_view_all') # Permite a qualquer usuário logado alterar sua senha
+def alterar_senha():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+
+    user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        flash('Usuário não encontrado.', 'danger')
+        session.clear() # Limpa a sessão para forçar novo login
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        # Validação básica da senha
+        if not new_password or not confirm_password:
+            flash('Por favor, preencha todos os campos.', 'danger')
+            return render_template('alterar_senha.html')
+        
+        if new_password != confirm_password:
+            flash('As senhas não coincidem.', 'danger')
+            return render_template('alterar_senha.html')
+        
+        if len(new_password) < 6:
+            flash('A nova senha deve ter no mínimo 6 caracteres.', 'danger')
+            return render_template('alterar_senha.html')
+
+        user.set_password(new_password)
+        db.session.commit()
+
+        # Log da alteração de senha
+        new_log = Log(
+            action="ALTERAR_SENHA_USUARIO",
+            details=f"Usuário '{user.username}' alterou sua própria senha.",
+            user_id=user.id,
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        # MENSAGEM ALTERADA AQUI
+        flash('Sua senha foi alterada com sucesso! Por favor, faça login novamente com a nova senha.', 'success')
+        session.clear() # Força o logout para que o usuário use a nova senha
+        return redirect(url_for('login'))
+
+    return render_template('alterar_senha.html')
 
 # ============= INICIALIZAÇÃO =============
 if __name__ == '__main__':

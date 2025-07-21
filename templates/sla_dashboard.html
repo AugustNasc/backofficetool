@@ -127,13 +127,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Tooltip
+    // Inicializa tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.forEach(function (tooltipTriggerEl) {
         new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    // Cálculo automático do Realizado (%) ao digitar
+    // Cálculo automático do Realizado (%)
     const dentro = document.getElementById('qtd_dentro_sla');
     const fora = document.getElementById('qtd_fora_sla');
     const realizado = document.getElementById('realizado');
@@ -154,9 +154,8 @@ document.addEventListener('DOMContentLoaded', function () {
     dentro.addEventListener('input', atualizarRealizado);
     fora.addEventListener('input', atualizarRealizado);
 
-    // Chart.js gráfico barra + linha meta
-    // Certifique-se que 'resultados' está sendo passado corretamente do Flask para o template
-    const resultadosData = {{ resultados|tojson|safe }}; // Pega os dados diretamente
+    // Gráfico de barras com linha de meta
+    const resultadosData = {{ resultados|tojson|safe }};
     const meses = resultadosData.map(r => r.mes_nome);
     const valores = resultadosData.map(r => r.realizado);
     

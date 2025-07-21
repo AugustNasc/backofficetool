@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Alterar Senha{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('menu') }}" class="btn btn-outline-primary mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao Menu
+</a>
+<div class="card shadow-sm" style="max-width: 500px; margin: auto;">
+    <div class="card-header bg-primary text-white">
+        <h2 class="mb-0">
+            <i class="bi bi-key"></i> Alterar Minha Senha
+        </h2>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label for="new_password" class="form-label">Nova Senha:</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
+                    <span class="input-group-text toggle-pwd" style="cursor:pointer;" onclick="togglePwd('new_password', 'toggleNewPwdIcon')">
+                        <i class="bi bi-eye-slash" id="toggleNewPwdIcon"></i>
+                    </span>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="confirm_password" class="form-label">Confirmar Nova Senha:</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="6">
+                    <span class="input-group-text toggle-pwd" style="cursor:pointer;" onclick="togglePwd('confirm_password', 'toggleConfirmPwdIcon')">
+                        <i class="bi bi-eye-slash" id="toggleConfirmPwdIcon"></i>
+                    </span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">
+                <i class="bi bi-save"></i> Alterar Senha
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function togglePwd(fieldId, iconId) {
+    var field = document.getElementById(fieldId);
+    var icon = document.getElementById(iconId);
+    if (field.type === "password") {
+        field.type = "text";
+        icon.classList.remove("bi-eye-slash");
+        icon.classList.add("bi-eye");
+    } else {
+        field.type = "password";
+        icon.classList.remove("bi-eye");
+        icon.classList.add("bi-eye-slash");
+    }
+}
+</script>
+{% endblock %}
