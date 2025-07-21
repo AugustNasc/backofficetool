@@ -15,11 +15,11 @@ As funcionalidades são projetadas para simplificar e automatizar diversas taref
 
 * **Login Seguro:** Autenticação de usuários baseada em banco de dados com hash de senha.
 * **Controle de Acesso:** Gerenciamento de sessão (login/logout) e proteção de rotas, garantindo que apenas usuários autorizados acessem determinadas funcionalidades.
-* **Perfis de Usuário (Roles):** Definição de diferentes perfis (`Admin`, `Backoffice`, `Consultor`, `Guest`) com permissões granulares para cada funcionalidade (ex: `can_view_all`, `can_edit_pleitos`, `can_manage_users`).
-* **Registro de Usuários:** Novos usuários são registrados com a role padrão 'Consultor'.
+* **Perfis de Usuário (Roles):** Definição de diferentes perfis (`Admin`, `Backoffice`, `Consultor`, `Guest`) com permissões granulares para cada funcionalidade.
+* **Registro de Usuários:** Novos usuários são registrados com o perfil padrão 'Consultor'.
 * **Gerenciamento de Usuários (Apenas Admin):** Interface para administradores visualizarem, editarem perfis e redefinirem senhas de outros usuários.
 * **Alteração de Senha (Usuário):** Usuários logados podem alterar suas próprias senhas de forma segura.
-* **Meu Perfil:** Acesso rápido via barra de navegação para visualizar informações do usuário logado (nome de usuário, cargo e, se configurado, data de criação da conta).
+* **Meu Perfil:** Acesso rápido via barra de navegação para visualizar informações do usuário logado (nome de usuário, cargo e data de criação da conta).
 
 ### **2. Análise e Gestão de Pleitos**
 
@@ -30,7 +30,7 @@ As funcionalidades são projetadas para simplificar e automatizar diversas taref
 * **Exclusão de Clientes/Produtos:** Filtragem automática de clientes e produtos específicos que devem ser excluídos da análise (configurável por Admin).
 * **Contas em Transição (Beta):** Ferramenta para gerenciar a transição de clientes entre consultores, ajustando a gestão dos pleitos automaticamente com base em uma planilha ou inserção manual.
 * **Exportação de Dados:** Exporta os dados filtrados para um novo arquivo Excel.
-* **Configuração de Atrasos:** A data limite para considerar pleitos atrasados agora é configurável por administradores.
+* **Configuração de Atrasos:** A data limite para considerar pleitos atrasados é configurável por administradores.
 
 ### **3. Cálculo de Multa Contratual**
 
@@ -45,11 +45,11 @@ As funcionalidades são projetadas para simplificar e automatizar diversas taref
 
 ### **4. Dashboard SLA Squad**
 
-* **Acompanhamento Mensal:** Permite o cadastro mensal de resultados de SLA, incluindo quantidade dentro/fora SLA e total de processos, **com todos os dados persistidos no banco de dados para histórico**.
+* **Acompanhamento Mensal:** Permite o cadastro mensal de resultados de SLA, incluindo quantidade dentro/fora SLA e total de processos, com todos os dados persistidos no banco de dados para histórico.
 * **Visualização de Desempenho:** Exibe o percentual `Realizado` e a `Meta` definida, com um gráfico de barras (Chart.js) para acompanhamento visual.
-* **Gestão de Meta Centralizada:** A meta mensal do SLA é agora **salva no banco de dados e pode ser definida/ajustada na tela de Configurações do Administrador**.
-* **Importação/Exportação:** Funcionalidades para importar dados de Excel e exportar o dashboard em formato Excel ou PDF, **com formatação aprimorada para valores decimais**.
-* **Fechamento de Ano:** Opção para "fechar o ano" quando todos os 12 meses são preenchidos, calculando a **mediana anual** dos valores realizados.
+* **Gestão de Meta Centralizada:** A meta mensal do SLA é salva no banco de dados e pode ser definida/ajustada na tela de Configurações do Administrador.
+* **Importação/Exportação:** Funcionalidades para importar dados de Excel e exportar o dashboard em formato Excel ou PDF, com formatação aprimorada para valores decimais.
+* **Fechamento de Ano:** Opção para "fechar o ano" quando todos os 12 meses são preenchidos, calculando a mediana anual dos valores realizados.
 
 ### **5. Monitor Jurídico**
 
